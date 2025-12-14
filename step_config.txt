@@ -1,0 +1,15 @@
+# Step Controller Configuration
+# Set to 'on' or 'off' to enable/disable steps
+# STEP1 = FastMRZ Fallback
+# STEP2 = PassportEye Fallback
+# STEP3 = EasyOCR Fallback
+# STEP4 = Tesseract OCR Fallback
+# STEP5 = Passport Validation Checker
+# STEP6 = AI Parser (Gemini)
+
+STEP1=off
+STEP2=on
+STEP3=off
+STEP4=off
+STEP5=off
+STEP6=off

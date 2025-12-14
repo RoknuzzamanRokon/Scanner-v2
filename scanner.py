@@ -1,6 +1,6 @@
 """
 Main scanner function with multi-layered fallback system
-Following the flow diagram: PassportEye → FastMRZ → Validator → AI (if enabled)
+Following the flow diagram: FastMRZ → PassportEye → EasyOCR → Tesseract → Validator → AI (if enabled)
 """
 import time
 from PIL import Image
@@ -10,6 +10,7 @@ from passportEye import validate_passport_with_PassportEye_fallback
 from fastMRZ import validate_passport_with_fastmrz_fallback  
 from passport_detector import passport_validation_checker
 from gemini_passport_parser import gemini_ocr
+from function_handler_switch import is_step_enabled, print_step_status
 
 
 def scan_passport(
@@ -58,6 +59,9 @@ def scan_passport(
         print("="*60)
         print(f"🔧 AI Mode: {'ON' if use_gemini else 'OFF'}")
         
+        # Show step controller status
+        print_step_status()
+        
         step_start = time.time()
         if image_url:
             print(f"\n📥 Loading image from URL...")
@@ -82,123 +86,35 @@ def scan_passport(
         
         step_timings["image_loading"] = f"{time.time() - step_start:.2f}s"
         
+        # Initialize result variables to avoid undefined errors
+        fastmrz_result = {"error": "Step not executed", "success": False}
+        passporteye_result = {"error": "Step not executed", "success": False}
+        easyocr_result = {"error": "Step not executed", "success": False}
+        tesseract_result = {"error": "Step not executed", "success": False}
+        ai_result = {"error": "Step not executed", "success": False}
+        
         # STEP 1: FastMRZ Fallback Validation
-        print("\n" + "-"*60)
-        print("🔍 STEP 1: FastMRZ Fallback Validation")
-        print("-"*60)
-        
-        step_start = time.time()
-        fastmrz_result = validate_passport_with_fastmrz_fallback(image, verbose=True)
-        step_timings["step1_fastmrz"] = f"{time.time() - step_start:.2f}s"
-        working_process_step["step1_fastmrz"] = fastmrz_result.get("method_used", "FastMRZ")
-        
-        if fastmrz_result.get("success", False):
-            print("\n✅ SUCCESS via FastMRZ (Early Exit)")
-            total_time = time.time() - total_start_time
+        if is_step_enabled("STEP1"):
+            print("\n" + "-"*60)
+            print("🔍 STEP 1: FastMRZ Fallback Validation")
+            print("-"*60)
             
-            return {
-                "success": True,
-                "passport_data": {
-                    "processVia": "EasyOCR", 
-                    **fastmrz_result.get("passport_data", {})
-                },
-                "mrz_text": fastmrz_result.get("mrz_text", ""),
-                "working_process_step": working_process_step,
-                "step_timings": step_timings,
-                "total_time": f"{total_time:.2f}s",
-                "error": "",
-                "validation_reason": "",
-                "validation_confidence": ""
-            }
-        
-        print(f"  ⚠ FastMRZ failed: {fastmrz_result.get('error', 'Unknown error')}")
-        
-        # STEP 2: PassportEye Fallback Validation
-        print("\n" + "-"*60)
-        print("🔍 STEP 2: PassportEye Fallback Validation")
-        print("-"*60)
-        
-        step_start = time.time()
-        passporteye_result = validate_passport_with_PassportEye_fallback(image, verbose=True)
-        step_timings["step2_passporteye"] = f"{time.time() - step_start:.2f}s"
-        working_process_step["step2_passporteye"] = passporteye_result.get("method_used", "PassportEye")
-        
-        if passporteye_result.get("success", False):
-            print("\n✅ SUCCESS via PassportEye (Early Exit)")
-            total_time = time.time() - total_start_time
+            step_start = time.time()
+            fastmrz_result = validate_passport_with_fastmrz_fallback(image, verbose=True)
+            step_timings["step1_fastmrz"] = f"{time.time() - step_start:.2f}s"
+            working_process_step["step1_fastmrz"] = fastmrz_result.get("method_used", "FastMRZ")
             
-            return {
-                "success": True,
-                "passport_data": {
-                    "processVia": "PassportEye",
-                    **passporteye_result.get("passport_data", {})
-                },
-                "mrz_text": passporteye_result.get("mrz_text", ""),
-                "working_process_step": working_process_step,
-                "step_timings": step_timings,
-                "total_time": f"{total_time:.2f}s",
-                "error": "",
-                "validation_reason": "",
-                "validation_confidence": ""
-            }
-        
-        print(f"  ⚠ PassportEye failed: {passporteye_result.get('error', 'Unknown error')}")
-        
-        # STEP 3: EasyOCR Fallback Validation
-        print("\n" + "-"*60)
-        print("🔍 STEP 3: EasyOCR Fallback Validation")
-        print("-"*60)
-        
-        step_start = time.time()
-        from easyOCR import validate_passport_with_easyocr_fallback
-        easyocr_result = validate_passport_with_easyocr_fallback(image, verbose=True)
-        step_timings["step3_easyocr"] = f"{time.time() - step_start:.2f}s"
-        working_process_step["step3_easyocr"] = easyocr_result.get("method_used", "EasyOCR")
-        
-        if easyocr_result.get("success", False):
-            print("\n✅ SUCCESS via EasyOCR (Early Exit)")
-            total_time = time.time() - total_start_time
-            
-            return {
-                "success": True,
-                "passport_data": {
-                    "processVia": "EasyOCR",
-                    **easyocr_result.get("passport_data", {})
-                },
-                "mrz_text": easyocr_result.get("mrz_text", ""),
-                "working_process_step": working_process_step,
-                "step_timings": step_timings,
-                "total_time": f"{total_time:.2f}s",
-                "error": "",
-                "validation_reason": "",
-                "validation_confidence": ""
-            }
-        
-        print(f"  ⚠ EasyOCR failed: {easyocr_result.get('error', 'Unknown error')}")
-        
-        # STEP 4: Tesseract OCR Fallback Validation
-        print("\n" + "-"*60)
-        print("🔍 STEP 4: Tesseract OCR Fallback Validation")
-        print("-"*60)
-        
-        step_start = time.time()
-        try:
-            from tesseractOCR import validate_passport_with_tesseract_fallback
-            tesseract_result = validate_passport_with_tesseract_fallback(image, verbose=True)
-            step_timings["step4_tesseract"] = f"{time.time() - step_start:.2f}s"
-            working_process_step["step4_tesseract"] = tesseract_result.get("method_used", "Tesseract")
-            
-            if tesseract_result.get("success", False):
-                print("\n✅ SUCCESS via Tesseract OCR (Early Exit)")
+            if fastmrz_result.get("success", False):
+                print("\n✅ SUCCESS via FastMRZ (Early Exit)")
                 total_time = time.time() - total_start_time
                 
                 return {
                     "success": True,
                     "passport_data": {
-                        "processVia": "Tesseract",
-                        **tesseract_result.get("passport_data", {})
+                        "processVia": "EasyOCR", 
+                        **fastmrz_result.get("passport_data", {})
                     },
-                    "mrz_text": tesseract_result.get("mrz_text", ""),
+                    "mrz_text": fastmrz_result.get("mrz_text", ""),
                     "working_process_step": working_process_step,
                     "step_timings": step_timings,
                     "total_time": f"{total_time:.2f}s",
@@ -207,67 +123,201 @@ def scan_passport(
                     "validation_confidence": ""
                 }
             
-            print(f"  ⚠ Tesseract failed: {tesseract_result.get('error', 'Unknown error')}")
-            
-        except ImportError as e:
-            print(f"  ⚠ Tesseract not available: {e}")
-            tesseract_result = {"error": f"Tesseract not available: {e}"}
-            step_timings["step4_tesseract"] = f"{time.time() - step_start:.2f}s"
-            working_process_step["step4_tesseract"] = "Skipped (Import Error)"
-        except Exception as e:
-            print(f"  ⚠ Tesseract error: {e}")
-            tesseract_result = {"error": f"Tesseract error: {e}"}
-            step_timings["step4_tesseract"] = f"{time.time() - step_start:.2f}s"
-            working_process_step["step4_tesseract"] = "Failed"
+            print(f"  ⚠ FastMRZ failed: {fastmrz_result.get('error', 'Unknown error')}")
+        else:
+            print("\n" + "-"*60)
+            print("⏭ STEP 1: FastMRZ Fallback Validation - SKIPPED (DISABLED)")
+            print("-"*60)
+            fastmrz_result = {"error": "Step disabled", "success": False}
+            step_timings["step1_fastmrz"] = "0.00s"
+            working_process_step["step1_fastmrz"] = "Skipped (Disabled)"
         
-        # STEP 5: Passport Validation Checker  
-        print("\n" + "-"*60)
-        print("🔍 STEP 5: Passport Validation Checker")
-        print("-"*60)
+        # STEP 2: PassportEye Fallback Validation
+        if is_step_enabled("STEP2"):
+            print("\n" + "-"*60)
+            print("🔍 STEP 2: PassportEye Fallback Validation")
+            print("-"*60)
+            
+            step_start = time.time()
+            passporteye_result = validate_passport_with_PassportEye_fallback(image, verbose=True)
+            step_timings["step2_passporteye"] = f"{time.time() - step_start:.2f}s"
+            working_process_step["step2_passporteye"] = passporteye_result.get("method_used", "PassportEye")
+            
+            if passporteye_result.get("success", False):
+                print("\n✅ SUCCESS via PassportEye (Early Exit)")
+                total_time = time.time() - total_start_time
+                
+                return {
+                    "success": True,
+                    "passport_data": {
+                        "processVia": "PassportEye",
+                        **passporteye_result.get("passport_data", {})
+                    },
+                    "mrz_text": passporteye_result.get("mrz_text", ""),
+                    "working_process_step": working_process_step,
+                    "step_timings": step_timings,
+                    "total_time": f"{total_time:.2f}s",
+                    "error": "",
+                    "validation_reason": "",
+                    "validation_confidence": ""
+                }
+            
+            print(f"  ⚠ PassportEye failed: {passporteye_result.get('error', 'Unknown error')}")
+        else:
+            print("\n" + "-"*60)
+            print("⏭ STEP 2: PassportEye Fallback Validation - SKIPPED (DISABLED)")
+            print("-"*60)
+            passporteye_result = {"error": "Step disabled", "success": False}
+            step_timings["step2_passporteye"] = "0.00s"
+            working_process_step["step2_passporteye"] = "Skipped (Disabled)"
         
-        # Get MRZ text from previous attempts
-        mrz_text = fastmrz_result.get("mrz_text", "") or passporteye_result.get("mrz_text", "") or easyocr_result.get("mrz_text", "") or tesseract_result.get("mrz_text", "")
+        # STEP 3: EasyOCR Fallback Validation
+        if is_step_enabled("STEP3"):
+            print("\n" + "-"*60)
+            print("🔍 STEP 3: EasyOCR Fallback Validation")
+            print("-"*60)
+            
+            step_start = time.time()
+            from easyOCR import validate_passport_with_easyocr_fallback
+            easyocr_result = validate_passport_with_easyocr_fallback(image, verbose=True)
+            step_timings["step3_easyocr"] = f"{time.time() - step_start:.2f}s"
+            working_process_step["step3_easyocr"] = easyocr_result.get("method_used", "EasyOCR")
+            
+            if easyocr_result.get("success", False):
+                print("\n✅ SUCCESS via EasyOCR (Early Exit)")
+                total_time = time.time() - total_start_time
+                
+                return {
+                    "success": True,
+                    "passport_data": {
+                        "processVia": "EasyOCR",
+                        **easyocr_result.get("passport_data", {})
+                    },
+                    "mrz_text": easyocr_result.get("mrz_text", ""),
+                    "working_process_step": working_process_step,
+                    "step_timings": step_timings,
+                    "total_time": f"{total_time:.2f}s",
+                    "error": "",
+                    "validation_reason": "",
+                    "validation_confidence": ""
+                }
+            
+            print(f"  ⚠ EasyOCR failed: {easyocr_result.get('error', 'Unknown error')}")
+        else:
+            print("\n" + "-"*60)
+            print("⏭ STEP 3: EasyOCR Fallback Validation - SKIPPED (DISABLED)")
+            print("-"*60)
+            easyocr_result = {"error": "Step disabled", "success": False}
+            step_timings["step3_easyocr"] = "0.00s"
+            working_process_step["step3_easyocr"] = "Skipped (Disabled)"
         
-        step_start = time.time()
-        if mrz_text:
-            validation_result = passport_validation_checker(mrz_text, verbose=True)
-            step_timings["step5_validation"] = f"{time.time() - step_start:.2f}s"
-            working_process_step["step5_validation"] = "TD3 Validation"
+        # STEP 4: Tesseract OCR Fallback Validation
+        if is_step_enabled("STEP4"):
+            print("\n" + "-"*60)
+            print("🔍 STEP 4: Tesseract OCR Fallback Validation")
+            print("-"*60)
             
-            confidence = validation_result.get("confidence_score", 0.0)
-            is_valid = validation_result.get("is_valid", False)
-            
-            print(f"  → Validation Result: {is_valid}")
-            print(f"  → Confidence Score: {confidence*100:.1f}%")
-            
-            if is_valid and confidence >= 0.5:
-                if not use_gemini:
-                    # AI=OFF: Return success if validation passes
-                    print("\n✅ SUCCESS via Validation (AI=OFF Mode)")
+            step_start = time.time()
+            try:
+                from tesseractOCR import validate_passport_with_tesseract_fallback
+                tesseract_result = validate_passport_with_tesseract_fallback(image, verbose=True)
+                step_timings["step4_tesseract"] = f"{time.time() - step_start:.2f}s"
+                working_process_step["step4_tesseract"] = tesseract_result.get("method_used", "Tesseract")
+                
+                if tesseract_result.get("success", False):
+                    print("\n✅ SUCCESS via Tesseract OCR (Early Exit)")
                     total_time = time.time() - total_start_time
                     
                     return {
                         "success": True,
                         "passport_data": {
-                            "processVia": "EasyOCR",
-                            **validation_result.get("passport_data", {})
+                            "processVia": "Tesseract",
+                            **tesseract_result.get("passport_data", {})
                         },
-                        "mrz_text": mrz_text,
+                        "mrz_text": tesseract_result.get("mrz_text", ""),
                         "working_process_step": working_process_step,
                         "step_timings": step_timings,
                         "total_time": f"{total_time:.2f}s",
                         "error": "",
-                        "validation_reason": validation_result.get("reason", ""),
-                        "validation_confidence": f"{confidence*100:.1f}%"
+                        "validation_reason": "",
+                        "validation_confidence": ""
                     }
-                else:
-                    print(f"  → Validation passed but using AI for enhanced extraction...")
-            else:
-                print(f"  ⚠ Validation failed: {validation_result.get('reason', 'Low confidence')}")
+                
+                print(f"  ⚠ Tesseract failed: {tesseract_result.get('error', 'Unknown error')}")
+                
+            except ImportError as e:
+                print(f"  ⚠ Tesseract not available: {e}")
+                tesseract_result = {"error": f"Tesseract not available: {e}"}
+                step_timings["step4_tesseract"] = f"{time.time() - step_start:.2f}s"
+                working_process_step["step4_tesseract"] = "Skipped (Import Error)"
+            except Exception as e:
+                print(f"  ⚠ Tesseract error: {e}")
+                tesseract_result = {"error": f"Tesseract error: {e}"}
+                step_timings["step4_tesseract"] = f"{time.time() - step_start:.2f}s"
+                working_process_step["step4_tesseract"] = "Failed"
         else:
-            step_timings["step5_validation"] = f"{time.time() - step_start:.2f}s"
-            working_process_step["step5_validation"] = "Skipped (No MRZ)"
-            print(f"  ⚠ No MRZ text available for validation")
+            print("\n" + "-"*60)
+            print("⏭ STEP 4: Tesseract OCR Fallback Validation - SKIPPED (DISABLED)")
+            print("-"*60)
+            tesseract_result = {"error": "Step disabled", "success": False}
+            step_timings["step4_tesseract"] = "0.00s"
+            working_process_step["step4_tesseract"] = "Skipped (Disabled)"
+        
+        # STEP 5: Passport Validation Checker  
+        if is_step_enabled("STEP5"):
+            print("\n" + "-"*60)
+            print("🔍 STEP 5: Passport Validation Checker")
+            print("-"*60)
+            
+            # Get MRZ text from previous attempts
+            mrz_text = fastmrz_result.get("mrz_text", "") or passporteye_result.get("mrz_text", "") or easyocr_result.get("mrz_text", "") or tesseract_result.get("mrz_text", "")
+            
+            step_start = time.time()
+            if mrz_text:
+                validation_result = passport_validation_checker(mrz_text, verbose=True)
+                step_timings["step5_validation"] = f"{time.time() - step_start:.2f}s"
+                working_process_step["step5_validation"] = "TD3 Validation"
+                
+                confidence = validation_result.get("confidence_score", 0.0)
+                is_valid = validation_result.get("is_valid", False)
+                
+                print(f"  → Validation Result: {is_valid}")
+                print(f"  → Confidence Score: {confidence*100:.1f}%")
+                
+                if is_valid and confidence >= 0.5:
+                    if not use_gemini:
+                        # AI=OFF: Return success if validation passes
+                        print("\n✅ SUCCESS via Validation (AI=OFF Mode)")
+                        total_time = time.time() - total_start_time
+                        
+                        return {
+                            "success": True,
+                            "passport_data": {
+                                "processVia": "EasyOCR",
+                                **validation_result.get("passport_data", {})
+                            },
+                            "mrz_text": mrz_text,
+                            "working_process_step": working_process_step,
+                            "step_timings": step_timings,
+                            "total_time": f"{total_time:.2f}s",
+                            "error": "",
+                            "validation_reason": validation_result.get("reason", ""),
+                            "validation_confidence": f"{confidence*100:.1f}%"
+                        }
+                    else:
+                        print(f"  → Validation passed but using AI for enhanced extraction...")
+                else:
+                    print(f"  ⚠ Validation failed: {validation_result.get('reason', 'Low confidence')}")
+            else:
+                step_timings["step5_validation"] = f"{time.time() - step_start:.2f}s"
+                working_process_step["step5_validation"] = "Skipped (No MRZ)"
+                print(f"  ⚠ No MRZ text available for validation")
+        else:
+            print("\n" + "-"*60)
+            print("⏭ STEP 5: Passport Validation Checker - SKIPPED (DISABLED)")
+            print("-"*60)
+            step_timings["step5_validation"] = "0.00s"
+            working_process_step["step5_validation"] = "Skipped (Disabled)"
         
         # Generate user_id for temp folder
         from utils import get_user_id_from_url, get_user_id_from_base64
@@ -277,8 +327,8 @@ def scan_passport(
         elif image_base64:
             user_id = get_user_id_from_base64(image_base64)
 
-        # STEP 6: AI Parser (Final Fallback) - Only if AI=ON
-        if use_gemini:
+        # STEP 6: AI Parser (Final Fallback) - Only if AI=ON and Step Enabled
+        if use_gemini and is_step_enabled("STEP6"):
             print("\n" + "-"*60)
             print("🤖 STEP 6: AI Parser (Gemini - Final Fallback)")
             print("-"*60)
@@ -315,8 +365,14 @@ def scan_passport(
             
             print(f"  ⚠ AI Parser failed: {ai_result.get('error', 'Unknown error')}")
         else:
-            print("\n⏭ STEP 6: AI Parser - SKIPPED (AI=OFF)")
-            working_process_step["step6_ai_parser"] = "Skipped (AI=OFF)"
+            if not use_gemini:
+                print("\n⏭ STEP 6: AI Parser - SKIPPED (AI=OFF)")
+                working_process_step["step6_ai_parser"] = "Skipped (AI=OFF)"
+            elif not is_step_enabled("STEP6"):
+                print("\n⏭ STEP 6: AI Parser - SKIPPED (DISABLED)")
+                working_process_step["step6_ai_parser"] = "Skipped (Disabled)"
+            else:
+                working_process_step["step6_ai_parser"] = "Skipped"
         
         # All methods failed
         print("\n" + "="*60)
