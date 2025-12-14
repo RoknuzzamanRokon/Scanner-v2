@@ -1,0 +1,11 @@
+temp/
+.env
+Pipfile.lock
+decord.py
+test_data_with_gemini_ocr.py
+test_*.py
+
+test/
+.venv/
+
+.hypothesis

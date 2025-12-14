@@ -1,0 +1,16 @@
+fastapi
+fastmrz
+opencv-python
+pillow
+python-multipart
+google-generativeai
+requests
+pydantic
+uvicorn
+mrz
+passporteye
+easyocr
+python-dotenv
+pdf2image
+pypdf
+pytesseract

@@ -1,0 +1,290 @@
+"""
+Main scanner function with multi-layered fallback system
+Following the flow diagram: PassportEye → FastMRZ → Validator → AI (if enabled)
+"""
+import time
+from PIL import Image
+from typing import Dict, Optional
+from utils import download_image, decode_base64_image
+from passportEye import validate_passport_with_PassportEye_fallback
+from fastMRZ import validate_passport_with_fastmrz_fallback  
+from passport_detector import passport_validation_checker
+from gemini_passport_parser import gemini_ocr
+
+
+def scan_passport(
+    image_url: Optional[str] = None,
+    image_base64: Optional[str] = None,
+    document_type: str = "passport",
+    use_gemini: bool = True
+) -> Dict:
+    """
+    Scan passport image and extract MRZ data using multi-layered fallback system
+    
+    Flow (AI=ON):
+    1. PassportEye Fallback → Success? Return
+    2. FastMRZ Fallback → Success? Return  
+    3. Passport Validation → Valid? Continue
+    4. AI Parser (Gemini) → Success? Return
+    5. All failed → Error
+    
+    Flow (AI=OFF):
+    1. PassportEye Fallback → Success? Return
+    2. FastMRZ Fallback → Success? Return
+    3. Passport Validation → Valid? Return
+    4. All failed → Error
+    
+    Args:
+        image_url: URL of the passport image
+        image_base64: Base64 encoded passport image
+        document_type: Type of document (passport, id_card, visa)
+        use_gemini: Whether to use AI as final fallback
+        
+    Returns:
+        Dictionary with extracted passport data
+    """
+    total_start_time = time.time()
+    step_timings = {}
+    working_process_step = {}
+    
+    try:
+        # Step 0: Image Loading & Preprocessing
+        print("\n" + "="*60)
+        print("📄 PASSPORT SCANNER - MULTI-LAYERED FALLBACK SYSTEM")
+        print("="*60)
+        print(f"🔧 AI Mode: {'ON' if use_gemini else 'OFF'}")
+        
+        step_start = time.time()
+        if image_url:
+            print(f"\n📥 Loading image from URL...")
+            image = download_image(image_url)
+            print(f"  ✓ Image loaded: {image.size} {image.mode}")
+        elif image_base64:
+            print(f"\n📥 Decoding base64 image...")
+            image = decode_base64_image(image_base64)
+            print(f"  ✓ Image decoded: {image.size} {image.mode}")
+        else:
+            return {
+                "success": False,
+                "passport_data": {},
+                "mrz_text": "",
+                "working_process_step": {},
+                "step_timings": {},
+                "total_time": "0.00s",
+                "error": "No image provided. Please provide either image_url or image_base64",
+                "validation_reason": "",
+                "validation_confidence": ""
+            }
+        
+        step_timings["image_loading"] = f"{time.time() - step_start:.2f}s"
+        
+        # STEP 1: PassportEye Fallback Validation
+        print("\n" + "-"*60)
+        print("🔍 STEP 1: PassportEye Fallback Validation")
+        print("-"*60)
+        
+        step_start = time.time()
+        passporteye_result = validate_passport_with_PassportEye_fallback(image, verbose=True)
+        step_timings["step1_passporteye"] = f"{time.time() - step_start:.2f}s"
+        working_process_step["step1_passporteye"] = passporteye_result.get("method_used", "PassportEye")
+        
+        if passporteye_result.get("success", False):
+            print("\n✅ SUCCESS via PassportEye (Early Exit)")
+            total_time = time.time() - total_start_time
+            
+            return {
+                "success": True,
+                "passport_data": {
+                    "processVia": "PassportEye",
+                    **passporteye_result.get("passport_data", {})
+                },
+                "mrz_text": passporteye_result.get("mrz_text", ""),
+                "working_process_step": working_process_step,
+                "step_timings": step_timings,
+                "total_time": f"{total_time:.2f}s",
+                "error": "",
+                "validation_reason": "",
+                "validation_confidence": ""
+            }
+        
+        print(f"  ⚠ PassportEye failed: {passporteye_result.get('error', 'Unknown error')}")
+        
+        # STEP 2: FastMRZ Fallback Validation
+        print("\n" + "-"*60)
+        print("🔍 STEP 2: FastMRZ Fallback Validation")
+        print("-"*60)
+        
+        step_start = time.time()
+        fastmrz_result = validate_passport_with_fastmrz_fallback(image, verbose=True)
+        step_timings["step2_fastmrz"] = f"{time.time() - step_start:.2f}s"
+        working_process_step["step2_fastmrz"] = fastmrz_result.get("method_used", "FastMRZ")
+        
+        if fastmrz_result.get("success", False):
+            print("\n✅ SUCCESS via FastMRZ (Early Exit)")
+            total_time = time.time() - total_start_time
+            
+            return {
+                "success": True,
+                "passport_data": {
+                    "processVia": "EasyOCR",  # FastMRZ uses EasyOCR internally
+                    **fastmrz_result.get("passport_data", {})
+                },
+                "mrz_text": fastmrz_result.get("mrz_text", ""),
+                "working_process_step": working_process_step,
+                "step_timings": step_timings,
+                "total_time": f"{total_time:.2f}s",
+                "error": "",
+                "validation_reason": "",
+                "validation_confidence": ""
+            }
+        
+        print(f"  ⚠ FastMRZ failed: {fastmrz_result.get('error', 'Unknown error')}")
+        
+        # STEP 3: Passport Validation Checker  
+        print("\n" + "-"*60)
+        print("🔍 STEP 3: Passport Validation Checker")
+        print("-"*60)
+        
+        # Get MRZ text from previous attempts
+        mrz_text = passporteye_result.get("mrz_text", "") or fastmrz_result.get("mrz_text", "")
+        
+        step_start = time.time()
+        if mrz_text:
+            validation_result = passport_validation_checker(mrz_text, verbose=True)
+            step_timings["step3_validation"] = f"{time.time() - step_start:.2f}s"
+            working_process_step["step3_validation"] = "TD3 Validation"
+            
+            confidence = validation_result.get("confidence_score", 0.0)
+            is_valid = validation_result.get("is_valid", False)
+            
+            print(f"  → Validation Result: {is_valid}")
+            print(f"  → Confidence Score: {confidence*100:.1f}%")
+            
+            if is_valid and confidence >= 0.5:
+                if not use_gemini:
+                    # AI=OFF: Return success if validation passes
+                    print("\n✅ SUCCESS via Validation (AI=OFF Mode)")
+                    total_time = time.time() - total_start_time
+                    
+                    return {
+                        "success": True,
+                        "passport_data": {
+                            "processVia": "EasyOCR",
+                            **validation_result.get("passport_data", {})
+                        },
+                        "mrz_text": mrz_text,
+                        "working_process_step": working_process_step,
+                        "step_timings": step_timings,
+                        "total_time": f"{total_time:.2f}s",
+                        "error": "",
+                        "validation_reason": validation_result.get("reason", ""),
+                        "validation_confidence": f"{confidence*100:.1f}%"
+                    }
+                else:
+                    print(f"  → Validation passed but using AI for enhanced extraction...")
+            else:
+                print(f"  ⚠ Validation failed: {validation_result.get('reason', 'Low confidence')}")
+        else:
+            step_timings["step3_validation"] = f"{time.time() - step_start:.2f}s"
+            working_process_step["step3_validation"] = "Skipped (No MRZ)"
+            print(f"  ⚠ No MRZ text available for validation")
+        
+        # Generate user_id for temp folder
+        from utils import get_user_id_from_url, get_user_id_from_base64
+        user_id = None
+        if image_url:
+            user_id = get_user_id_from_url(image_url)
+        elif image_base64:
+            user_id = get_user_id_from_base64(image_base64)
+
+        # STEP 4: AI Parser (Final Fallback) - Only if AI=ON
+        if use_gemini:
+            print("\n" + "-"*60)
+            print("🤖 STEP 4: AI Parser (Gemini - Final Fallback)")
+            print("-"*60)
+            
+            step_start = time.time()
+            
+            # Use image_url if available, otherwise use PIL Image
+            if image_url:
+                ai_result = gemini_ocr(image_url, is_url=True, user_id=user_id)
+            else:
+                ai_result = gemini_ocr(image, is_url=False, user_id=user_id)
+            
+            step_timings["step4_ai_parser"] = f"{time.time() - step_start:.2f}s"
+            working_process_step["step4_ai_parser"] = "Gemini AI"
+            
+            if ai_result.get("success", False):
+                print("\n✅ SUCCESS via AI Parser")
+                total_time = time.time() - total_start_time
+                
+                return {
+                    "success": True,
+                    "passport_data": {
+                        "processVia": "AI",
+                        **ai_result.get("passport_data", {})
+                    },
+                    "mrz_text": ai_result.get("mrz_text", ""),
+                    "working_process_step": working_process_step,
+                    "step_timings": step_timings,
+                    "total_time": f"{total_time:.2f}s",
+                    "error": "",
+                    "validation_reason": "",
+                    "validation_confidence": ""
+                }
+            
+            print(f"  ⚠ AI Parser failed: {ai_result.get('error', 'Unknown error')}")
+        else:
+            print("\n⏭ STEP 4: AI Parser - SKIPPED (AI=OFF)")
+            working_process_step["step4_ai_parser"] = "Skipped (AI=OFF)"
+        
+        # All methods failed
+        print("\n" + "="*60)
+        print("❌ ALL VALIDATION METHODS FAILED")
+        print("="*60)
+        
+        total_time = time.time() - total_start_time
+        
+        # Collect all errors
+        errors = []
+        if passporteye_result.get("error"):
+            errors.append(f"PassportEye: {passporteye_result['error']}")
+        if fastmrz_result.get("error"):
+            errors.append(f"FastMRZ: {fastmrz_result['error']}")
+        if use_gemini:
+            if ai_result.get("error"):
+                errors.append(f"AI: {ai_result['error']}")
+        
+        error_message = " | ".join(errors) if errors else "All validation methods failed"
+        
+        return {
+            "success": False,
+            "passport_data": {},
+            "mrz_text": "",
+            "working_process_step": working_process_step,
+            "step_timings": step_timings,
+            "total_time": f"{total_time:.2f}s",
+            "error": error_message,
+            "validation_reason": "All extraction methods failed",
+            "validation_confidence": "0%"
+        }
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"\n❌ CRITICAL ERROR: {e}")
+        print(f"Traceback:\n{error_details}")
+        
+        total_time = time.time() - total_start_time
+        
+        return {
+            "success": False,
+            "passport_data": {},
+            "mrz_text": "",
+            "working_process_step": working_process_step,
+            "step_timings": step_timings,
+            "total_time": f"{total_time:.2f}s",
+            "error": f"System error: {str(e)}",
+            "validation_reason": "",
+            "validation_confidence": ""
+        }
