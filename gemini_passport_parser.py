@@ -7,7 +7,7 @@ import requests
 from io import BytesIO
 import re
 from typing import Dict
-from gemini_ocr import extract_text_with_gemini, extract_mrz_with_gemini
+from gemini_ocr import extract_text_with_gemini
 from country_code import get_country_info
 
 
@@ -82,7 +82,7 @@ def get_country_details(country_code: str) -> dict:
 
 def gemini_ocr(image_input, is_url: bool = True, user_id: str = None) -> Dict:
     """
-    Extract passport data using AI - supports both URL and PIL Image
+    Extract passport data using AI full text extraction - supports both URL and PIL Image
     
     Args:
         image_input: Either a URL string or PIL Image object
@@ -163,13 +163,13 @@ def _gemini_ocr_from_image(image: Image.Image, user_id: str = None) -> Dict:
     finally:
         # Cleanup
         if user_folder:
-            cleanup_user_folder(user_folder)
+            # cleanup_user_folder(user_folder)
             print(f"  → Cleaned up temp folder")
 
 
 def gemini_ocr_from_url(image_url: str) -> Dict:
     """
-    Extract passport data from image URL using AI 3-step approach
+    Extract passport data from image URL using AI full text extraction
     
     Args:
         image_url: URL of the passport image
@@ -201,75 +201,9 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
             image = rgb_image
             print(f"  ✓ Image converted to RGB")
         
-        # AI Step 1: Extract MRZ Text (Optimized) - Requested Priority
-        print(f"  → AI Step 1: Extracting MRZ Text (Optimized)...")
-        try:
-            mrz_text = extract_mrz_with_gemini(image)
-        except Exception as e:
-            # If it's an API error, return immediately without trying Step 2
-            error_msg = str(e)
-            if "AI parser failed:" in error_msg:
-                print(f"  ✗ {error_msg}")
-                return {
-                    "success": False,
-                    "passport_data": {},
-                    "mrz_text": "",
-                    "error": error_msg
-                }
-            # Otherwise, set mrz_text to empty and continue
-            mrz_text = ""
-        
-        parsed_data = {}
-        mrz_success = False
-        
-        if mrz_text and isinstance(mrz_text, str) and len(mrz_text.strip()) > 0:
-            print(f"  ✓ MRZ Text Extracted:\n{mrz_text}")
-            
-            # Validate with FastMRZ
-            try:
-                from fastmrz import FastMRZ
-                fast_mrz = FastMRZ()
-                details = fast_mrz._parse_mrz(mrz_text.strip())
-                
-                print(f"  → FastMRZ Result: {details}")
-                
-                # Check if we have core fields
-                if details and details.get('document_number') and details.get('issuer_code'):
-                    print(f"  ✓ MRZ parsed successfully")
-                    
-                    # Map to standard format - use issuer_code for country lookup
-                    issuer_code = clean_country_code(details.get('issuer_code', ''))
-                    country_details = get_country_details(issuer_code)
-                    
-                    parsed_data = {
-                        "document_type": details.get('document_code', 'P'),
-                        "country_code": issuer_code,
-                        "surname": details.get('surname', '').replace('<', ' ').strip(),
-                        "given_names": details.get('given_name', '').replace('<', ' ').strip(),
-                        "passport_number": details.get('document_number', ''),
-                        "country_name": country_details["country_name"],
-                        "country_iso": country_details["country_iso"],
-                        "nationality": country_details["nationality"],
-                        "date_of_birth": details.get('birth_date', ''), # YYYY-MM-DD from FastMRZ
-                        "sex": details.get('sex', ''),
-                        "expiry_date": details.get('expiry_date', ''), # YYYY-MM-DD from FastMRZ
-                        "personal_number": details.get('optional_data', '').replace('<', '').strip()
-                    }
-                    mrz_success = True
-            except Exception as e:
-                print(f"  ⚠ FastMRZ validation failed: {e}")
-                # Continue to fallback with full text extraction
-        
-        if mrz_success:
-            return {
-                "success": True,
-                "passport_data": parsed_data,
-                "mrz_text": mrz_text if mrz_text else "",
-                "error": ""
-            }
-            
-        # Fallback: AI Step 2 - Extract full text and reconstruct
-        print(f"  → AI Step 2: MRZ extraction failed/incomplete, trying Full Text extraction...")
+        # AI Step 1: Extract full text and reconstruct
+        print(f"  → AI Step 1: Full Text extraction and data reconstruction...")
+        mrz_text = ""  # Initialize mrz_text
         try:
             full_text = extract_text_with_gemini(image)
         except Exception as e:
@@ -447,7 +381,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
             print(f"     {key}: {value}")
         
         # Reconstruct MRZ if we have enough validation data
-        corrected_mrz = mrz_text
+        corrected_mrz = ""
         if len(validation_data) >= 5:  # Need at least 5 fields to reconstruct
             print(f"\n  → Reconstructing MRZ from validation data...")
             
@@ -482,6 +416,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
             line2 = line2[:44].ljust(44, '<')
             
             corrected_mrz = f"{line1}\n{line2}"
+            mrz_text = corrected_mrz  # Set mrz_text to the reconstructed MRZ
             print(f"  ✓ MRZ reconstructed from validation data")
             print(f"\n  → Using MRZ text:")
             for line in corrected_mrz.split('\n'):
@@ -534,7 +469,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
                     return {
                         "success": True,
                         "passport_data": passport_data,
-                        "mrz_text": corrected_mrz,
+                        "mrz_text": mrz_text,
                         "error": ""
                     }
                 else:
@@ -595,7 +530,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
         return {
             "success": True,
             "passport_data": passport_data,
-            "mrz_text": corrected_mrz if corrected_mrz else "",
+            "mrz_text": mrz_text,
             "error": ""
         }
         

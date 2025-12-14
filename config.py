@@ -35,6 +35,9 @@ class Config:
     # Gemini API
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     
+    # Tesseract OCR
+    TESSERACT_CMD = os.getenv("TESSERACT_CMD", "")
+    
     # Processing Settings
     DEFAULT_USE_GEMINI = True
     MIN_CONFIDENCE_THRESHOLD = 0.5  # 50% confidence required
