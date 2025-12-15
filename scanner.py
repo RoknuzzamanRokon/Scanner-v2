@@ -86,6 +86,21 @@ def scan_passport(
         
         step_timings["image_loading"] = f"{time.time() - step_start:.2f}s"
         
+        # Generate user_id and folder for temp files (needed for debug images)
+        from utils import get_user_id_from_url, get_user_id_from_base64, create_user_temp_folder
+        user_id = None
+        user_folder = None
+        user_folder_path = None
+        
+        if image_url:
+            user_id = get_user_id_from_url(image_url)
+        elif image_base64:
+            user_id = get_user_id_from_base64(image_base64)
+        
+        if user_id:
+            user_folder_path = create_user_temp_folder(user_id)
+            user_folder = str(user_folder_path)
+        
         # Initialize result variables to avoid undefined errors
         fastmrz_result = {"error": "Step not executed", "success": False}
         passporteye_result = {"error": "Step not executed", "success": False}
@@ -106,12 +121,18 @@ def scan_passport(
             
             if fastmrz_result.get("success", False):
                 print("\n✅ SUCCESS via FastMRZ (Early Exit)")
+                
+                # Clean up user temp folder on success
+                if user_folder_path:
+                    from utils import cleanup_user_folder
+                    cleanup_user_folder(user_folder_path)
+                
                 total_time = time.time() - total_start_time
                 
                 return {
                     "success": True,
                     "passport_data": {
-                        "processVia": "EasyOCR", 
+                        "processVia": "FastMRZ", 
                         **fastmrz_result.get("passport_data", {})
                     },
                     "mrz_text": fastmrz_result.get("mrz_text", ""),
@@ -145,6 +166,12 @@ def scan_passport(
             
             if passporteye_result.get("success", False):
                 print("\n✅ SUCCESS via PassportEye (Early Exit)")
+                
+                # Clean up user temp folder on success
+                if user_folder_path:
+                    from utils import cleanup_user_folder
+                    cleanup_user_folder(user_folder_path)
+                
                 total_time = time.time() - total_start_time
                 
                 return {
@@ -171,6 +198,8 @@ def scan_passport(
             step_timings["step2_passporteye"] = "0.00s"
             working_process_step["step2_passporteye"] = "Skipped (Disabled)"
         
+
+
         # STEP 3: EasyOCR Fallback Validation
         if is_step_enabled("STEP3"):
             print("\n" + "-"*60)
@@ -179,12 +208,18 @@ def scan_passport(
             
             step_start = time.time()
             from easyOCR import validate_passport_with_easyocr_fallback
-            easyocr_result = validate_passport_with_easyocr_fallback(image, verbose=True)
+            easyocr_result = validate_passport_with_easyocr_fallback(image, verbose=True, user_folder=user_folder)
             step_timings["step3_easyocr"] = f"{time.time() - step_start:.2f}s"
             working_process_step["step3_easyocr"] = easyocr_result.get("method_used", "EasyOCR")
             
             if easyocr_result.get("success", False):
                 print("\n✅ SUCCESS via EasyOCR (Early Exit)")
+                
+                # Clean up user temp folder on success
+                if user_folder_path:
+                    from utils import cleanup_user_folder
+                    cleanup_user_folder(user_folder_path)
+                
                 total_time = time.time() - total_start_time
                 
                 return {
@@ -226,6 +261,12 @@ def scan_passport(
                 
                 if tesseract_result.get("success", False):
                     print("\n✅ SUCCESS via Tesseract OCR (Early Exit)")
+                    
+                    # Clean up user temp folder on success
+                    if user_folder_path:
+                        from utils import cleanup_user_folder
+                        cleanup_user_folder(user_folder_path)
+                    
                     total_time = time.time() - total_start_time
                     
                     return {
@@ -288,6 +329,12 @@ def scan_passport(
                     if not use_gemini:
                         # AI=OFF: Return success if validation passes
                         print("\n✅ SUCCESS via Validation (AI=OFF Mode)")
+                        
+                        # Clean up user temp folder on success
+                        if user_folder_path:
+                            from utils import cleanup_user_folder
+                            cleanup_user_folder(user_folder_path)
+                        
                         total_time = time.time() - total_start_time
                         
                         return {
@@ -319,13 +366,7 @@ def scan_passport(
             step_timings["step5_validation"] = "0.00s"
             working_process_step["step5_validation"] = "Skipped (Disabled)"
         
-        # Generate user_id for temp folder
-        from utils import get_user_id_from_url, get_user_id_from_base64
-        user_id = None
-        if image_url:
-            user_id = get_user_id_from_url(image_url)
-        elif image_base64:
-            user_id = get_user_id_from_base64(image_base64)
+
 
         # STEP 6: AI Parser (Final Fallback) - Only if AI=ON and Step Enabled
         if use_gemini and is_step_enabled("STEP6"):
@@ -346,6 +387,12 @@ def scan_passport(
             
             if ai_result.get("success", False):
                 print("\n✅ SUCCESS via AI Parser")
+                
+                # Clean up user temp folder on success
+                if user_folder_path:
+                    from utils import cleanup_user_folder
+                    cleanup_user_folder(user_folder_path)
+                
                 total_time = time.time() - total_start_time
                 
                 return {
@@ -378,6 +425,11 @@ def scan_passport(
         print("\n" + "="*60)
         print("❌ ALL VALIDATION METHODS FAILED")
         print("="*60)
+        
+        # Clean up user temp folder on failure
+        if user_folder_path:
+            from utils import cleanup_user_folder
+            cleanup_user_folder(user_folder_path)
         
         total_time = time.time() - total_start_time
         
@@ -414,6 +466,11 @@ def scan_passport(
         error_details = traceback.format_exc()
         print(f"\n❌ CRITICAL ERROR: {e}")
         print(f"Traceback:\n{error_details}")
+        
+        # Clean up user temp folder on critical error
+        if 'user_folder_path' in locals() and user_folder_path:
+            from utils import cleanup_user_folder
+            cleanup_user_folder(user_folder_path)
         
         total_time = time.time() - total_start_time
         

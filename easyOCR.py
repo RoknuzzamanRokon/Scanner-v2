@@ -13,7 +13,7 @@ from country_code import get_country_info
 from utils import format_mrz_date
 
 
-def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = True) -> Dict:
+def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = True, user_folder: str = None) -> Dict:
     """
     STEP 3: EasyOCR Fallback Validation
     
@@ -33,27 +33,79 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
         if verbose:
             print(f"  → Processing with EasyOCR...")
         
-        # Convert PIL Image to OpenCV format
-        img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        # Handle EXIF orientation to match OpenCV loading behavior
+        # PIL automatically applies EXIF rotation, but OpenCV doesn't
+        # We need to "undo" PIL's automatic rotation to match OpenCV behavior
         
-        # Preprocessing for better OCR
-        gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+        try:
+            exif = image.getexif()
+            orientation = exif.get(274) if exif else None  # 274 is EXIF orientation tag
+            
+            if verbose:
+                print(f"    Debug: EXIF orientation: {orientation}")
+            
+            # Undo PIL's automatic EXIF rotation to match OpenCV behavior
+            if orientation == 3:
+                image = image.rotate(180, expand=True)
+            elif orientation == 6:
+                image = image.rotate(-90, expand=True)  # Undo the 90° CW rotation
+            elif orientation == 8:
+                image = image.rotate(90, expand=True)   # Undo the 90° CCW rotation
+                
+        except Exception as e:
+            if verbose:
+                print(f"    Debug: Could not process EXIF: {e}")
         
-        # Apply adaptive thresholding for better text recognition
-        thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+        # Convert PIL to OpenCV format
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Convert to numpy array and then to OpenCV format
+        img_array = np.array(image)
+        img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        
+        # Convert to grayscale exactly like standalone script
+        processed_image = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
         
         if verbose:
             print(f"  → Running EasyOCR text extraction...")
         
-        # Initialize EasyOCR reader
-        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        # Initialize EasyOCR reader with exact same settings as working version
+        reader = easyocr.Reader(['en'], gpu=False)  # Remove verbose=False to match standalone
         
-        # Extract text with bounding boxes
-        results = reader.readtext(thresh, detail=1)
+        # Save debug image to user-specific temp folder
+        debug_path = None
+        if verbose:
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            debug_filename = f"debug_easyocr_{timestamp}.jpg"
+            
+            if user_folder:
+                # Save to user-specific temp folder
+                debug_path = os.path.join(user_folder, debug_filename)
+            else:
+                # Fallback to temp folder
+                debug_path = os.path.join("temp", debug_filename)
+                
+            cv2.imwrite(debug_path, processed_image)
+            print(f"    Processed image shape: {processed_image.shape}")
+            print(f"    Debug image saved: {debug_path}")
         
-        if not results:
+        # Extract text - use detail=0 like the working version for simpler text extraction
+        results_text = reader.readtext(processed_image, detail=0)
+        
+        if verbose:
+            print(f"    EasyOCR extracted {len(results_text)} text segments")
+            
+        # Also get detailed results for confidence checking if needed
+        results_detailed = []
+        if len(results_text) < 10:  # Only get detailed if we have few results
+            results_detailed = reader.readtext(processed_image, detail=1)
+        
+        if not results_text:
             if verbose:
                 print(f"  ✗ EasyOCR: No text detected")
+            
             return {
                 "success": False,
                 "passport_data": {},
@@ -62,25 +114,35 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
                 "error": "No text detected by EasyOCR"
             }
         
-        # Extract all text
-        all_text = []
-        for (bbox, text, confidence) in results:
-            if confidence > 0.5:  # Filter low confidence text
-                all_text.append(text.upper())
-        
+        # Extract all text - use the simple text results like the working version
+        all_text = [text.upper() for text in results_text]
         full_text = " ".join(all_text)
+        
+        # Also get high confidence text for MRZ detection
+        high_confidence_text = []
+        for (bbox, text, confidence) in results_detailed:
+            if confidence > 0.5:  # Filter low confidence text for MRZ detection
+                high_confidence_text.append(text.upper())
         
         if verbose:
             print(f"  ✓ Text extracted: {len(all_text)} segments")
-            print(f"    Full text preview: {full_text}...")
+            print(f"    Full text preview: {full_text[:200]}...")
+            print(f"    All extracted segments:")
+            for i, text in enumerate(all_text):
+                print(f"      {i+1}: '{text}'")
         
-        # Check if this looks like a passport
+        # Check if this looks like a passport - use same logic as working version
         is_passport_word = "PASSPORT" in full_text
-        has_mrz_chars = bool(re.search(r"<{3,}", full_text))  # Look for MRZ patterns
+        has_mrz_chars = bool(re.search(r"<{5,}", full_text))  # Look for 5+ consecutive < like working version
+        
+        if verbose:
+            print(f"    Passport word found: {is_passport_word}")
+            print(f"    MRZ pattern found: {has_mrz_chars}")
         
         if not (is_passport_word or has_mrz_chars):
             if verbose:
                 print(f"  ✗ Document doesn't appear to be a passport")
+            
             return {
                 "success": False,
                 "passport_data": {},
@@ -94,7 +156,9 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
         potential_mrz = []
         
         # Look for lines that could be MRZ (contain < symbols and are long)
-        for text in all_text:
+        # Use both all_text and high_confidence_text for MRZ detection
+        combined_text = list(set(all_text + high_confidence_text))
+        for text in combined_text:
             if '<' in text and len(text) >= 20:
                 potential_mrz.append(text)
         
@@ -105,12 +169,29 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
         
         # Try to reconstruct MRZ from potential segments
         if len(potential_mrz) >= 2:
-            # Sort by length (longer lines first)
-            potential_mrz.sort(key=len, reverse=True)
+            # Find the correct order for TD3 format
+            # Line 1 should start with 'P' (passport type)
+            # Line 2 should contain passport number and other data
             
-            # Take the two longest segments as potential MRZ lines
-            line1_candidate = potential_mrz[0]
-            line2_candidate = potential_mrz[1]
+            line1_candidate = None
+            line2_candidate = None
+            
+            # Look for line starting with 'P'
+            for mrz in potential_mrz:
+                if mrz.startswith('P'):
+                    line1_candidate = mrz
+                    break
+            
+            # Find the other line (should be the longest remaining one)
+            remaining_lines = [mrz for mrz in potential_mrz if mrz != line1_candidate]
+            if remaining_lines:
+                line2_candidate = max(remaining_lines, key=len)
+            
+            # Fallback: if no 'P' line found, use the two longest
+            if not line1_candidate or not line2_candidate:
+                potential_mrz.sort(key=len, reverse=True)
+                line1_candidate = potential_mrz[0]
+                line2_candidate = potential_mrz[1]
             
             # Clean and validate
             line1 = clean_mrz_line(line1_candidate)
@@ -135,6 +216,7 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
             if not passport_data.get("passport_number") and not passport_data.get("surname"):
                 if verbose:
                     print(f"  ✗ Could not extract meaningful passport data")
+                
                 return {
                     "success": False,
                     "passport_data": {},
@@ -153,6 +235,7 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
             else:
                 if verbose:
                     print(f"  ⚠ Could not reconstruct valid MRZ")
+                
                 return {
                     "success": False,
                     "passport_data": passport_data,
@@ -183,6 +266,7 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
         if not is_valid or confidence < 0.5:
             if verbose:
                 print(f"  ✗ MRZ validation failed: {validation_result.get('reason', 'Low confidence')}")
+            
             return {
                 "success": False,
                 "passport_data": {},
@@ -217,6 +301,8 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
             print(f"    Passport #: {passport_data.get('passport_number', '')}")
             print(f"    Country: {passport_data.get('country_name', '')} ({country_code})")
         
+        # Note: User folder cleanup will be handled by scanner.py on success
+        
         return {
             "success": True,
             "passport_data": passport_data,
@@ -238,6 +324,8 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
             "method_used": "EasyOCR",
             "error": f"EasyOCR processing error: {str(e)}"
         }
+    
+
 
 
 def clean_mrz_line(line: str) -> str:
