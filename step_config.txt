@@ -9,7 +9,7 @@
 
 STEP1=on
 STEP2=on
-STEP3=on
+STEP3=off
 STEP4=off
 STEP5=off
-STEP6=on
+STEP6=off
