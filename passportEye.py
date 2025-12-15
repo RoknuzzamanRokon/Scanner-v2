@@ -600,7 +600,8 @@ def process_passport_image(image_path):
                 # Summary
                 valid_count = sum(1 for status in field_results.values() if status == "Valid")
                 total_count = len(field_results)
-                print(f"\nField Validation Summary: {valid_count}/{total_count} fields are valid")
+                print(f"\nField Validation Summary: {valid_count}/{total_count} fields are valid\n\n")
+            
             else:
                 print("❌ No MRZ text available for field validation")
         else:

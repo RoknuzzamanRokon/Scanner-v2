@@ -166,6 +166,9 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
             print(f"  → Found {len(potential_mrz)} potential MRZ segments")
             for i, mrz in enumerate(potential_mrz):
                 print(f"    MRZ {i+1}: {mrz}")
+                print(f"      Starts with 'P': {mrz.startswith('P')}")
+                print(f"      Length: {len(mrz)}")
+                print(f"      Pattern match: {bool(re.match(r'^[A-Z0-9]', mrz))}")
         
         # Try to reconstruct MRZ from potential segments
         if len(potential_mrz) >= 2:
@@ -182,16 +185,54 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
                     line1_candidate = mrz
                     break
             
-            # Find the other line (should be the longest remaining one)
+            # Find the second line - should be the one that looks like a passport number line
+            # TD3 Line 2 has specific characteristics: passport number + check digits + dates
             remaining_lines = [mrz for mrz in potential_mrz if mrz != line1_candidate]
             if remaining_lines:
-                line2_candidate = max(remaining_lines, key=len)
+                # Look for line that has MRZ characteristics:
+                # 1. Contains multiple < symbols (MRZ padding)
+                # 2. Has numeric patterns (dates, check digits)
+                # 3. Is around 44 characters or can be padded to 44
+                best_score = -1
+                for line in remaining_lines:
+                    score = 0
+                    
+                    # Score based on MRZ characteristics
+                    if '<' in line:
+                        score += line.count('<') * 2  # More < symbols = more likely MRZ
+                    
+                    # Check for numeric patterns (dates, passport numbers)
+                    if re.search(r'\d{6,}', line):  # 6+ consecutive digits (dates)
+                        score += 10
+                    
+                    # Check for typical MRZ length or close to it
+                    if 40 <= len(line) <= 50:
+                        score += 5
+                    
+                    # Penalize lines with common words (not MRZ)
+                    if any(word in line.upper() for word in ['REPUBLIC', 'PEOPLE', 'BANGLADESH', 'PASSPORT']):
+                        score -= 20
+                    
+                    if verbose:
+                        print(f"      Line '{line[:30]}...' score: {score}")
+                    
+                    if score > best_score:
+                        best_score = score
+                        line2_candidate = line
+                
+                # If no good candidate found, use the longest remaining
+                if not line2_candidate:
+                    line2_candidate = max(remaining_lines, key=len)
             
             # Fallback: if no 'P' line found, use the two longest
             if not line1_candidate or not line2_candidate:
                 potential_mrz.sort(key=len, reverse=True)
                 line1_candidate = potential_mrz[0]
                 line2_candidate = potential_mrz[1]
+            
+            if verbose:
+                print(f"    Selected Line 1 candidate: {line1_candidate}")
+                print(f"    Selected Line 2 candidate: {line2_candidate}")
             
             # Clean and validate
             line1 = clean_mrz_line(line1_candidate)
@@ -274,7 +315,26 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
                 "method_used": "EasyOCR",
                 "error": f"MRZ validation failed: {validation_result.get('reason', 'Low confidence')} (confidence: {confidence*100:.1f}%)"
             }
+            
         
+        mrz_for_validation =  f"{mrz_lines[0]}" + "\n" + f"{mrz_lines[1]}"  
+            
+        # Import and use the passport field validation function
+        from passport_check import validate_passport_fields
+        
+        field_results = validate_passport_fields(mrz_for_validation)
+        # Display results in terminal
+        for field, status in field_results.items():
+            status_icon = "✅" if status == "Valid" else "❌"
+            print(f"{status_icon} {field:20}: {status}")
+        
+        
+        # Summary
+        valid_count = sum(1 for status in field_results.values() if status == "Valid")
+        total_count = len(field_results)
+        print(f"\nField Validation Summary: {valid_count}/{total_count} fields are valid\n\n")
+        
+            
         # Extract passport data from validated MRZ
         passport_data = validation_result.get("passport_data", {})
         

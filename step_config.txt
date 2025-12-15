@@ -7,9 +7,9 @@
 # STEP5 = Passport Validation Checker
 # STEP6 = AI Parser (Gemini)
 
-STEP1=on
-STEP2=on
+STEP1=off
+STEP2=off
 STEP3=off
-STEP4=off
+STEP4=on
 STEP5=off
 STEP6=off

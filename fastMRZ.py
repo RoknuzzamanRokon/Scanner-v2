@@ -391,6 +391,26 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
                 }
 
             
+            print(f"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            
+            mrz_for_validation =  f"{mrz_text}"  
+            
+            # Import and use the passport field validation function
+            from passport_check import validate_passport_fields
+            
+            field_results = validate_passport_fields(mrz_for_validation)
+            # Display results in terminal
+            for field, status in field_results.items():
+                status_icon = "✅" if status == "Valid" else "❌"
+                print(f"{status_icon} {field:20}: {status}")
+                
+            # Summary
+            valid_count = sum(1 for status in field_results.values() if status == "Valid")
+            total_count = len(field_results)
+            print(f"\nField Validation Summary: {valid_count}/{total_count} fields are valid\n\n")
+        
+            
+            
             if verbose:
                 print(f"  ✓ Passport data extracted successfully")
                 print(f"    Surname: {surname}")
