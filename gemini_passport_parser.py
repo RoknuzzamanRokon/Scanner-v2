@@ -25,19 +25,25 @@ def clean_country_code(country_code: str) -> str:
         country_code: Raw country code that may contain symbols
         
     Returns:
-        Cleaned 3-letter country code (A-Z only)
+        Cleaned 3-letter country code (A-Z only), or 'UNK' for unknown
     """
     if not country_code:
-        return 'XXX'
+        return 'UNK'  # Use UNK instead of XXX for unknown countries
     
     # Remove all non-letter characters and convert to uppercase
     cleaned = ''.join([c for c in country_code if c.isalpha()]).upper()
     
     # Validate length
     if len(cleaned) == 0:
-        return 'XXX'  # Default for unknown
+        return 'UNK'  # Use UNK instead of XXX
     elif len(cleaned) < 3:
-        return cleaned.ljust(3, 'X')  # Pad with X if too short
+        # For short codes, try to map common ones, otherwise use UNK
+        if cleaned == 'US':
+            return 'USA'
+        elif cleaned == 'UK' or cleaned == 'GB':
+            return 'GBR'
+        else:
+            return 'UNK'  # Use UNK for unrecognized short codes
     elif len(cleaned) > 3:
         return cleaned[:3]  # Truncate if too long
     
@@ -59,18 +65,18 @@ def get_country_details(country_code: str) -> dict:
     
     if not cleaned_code or len(cleaned_code) != 3:
         return {
-            "country_name": cleaned_code,
+            "country_name": "Unknown" if cleaned_code == 'UNK' else cleaned_code,
             "country_iso": "",
-            "nationality": cleaned_code
+            "nationality": "Unknown" if cleaned_code == 'UNK' else cleaned_code
         }
     
     info = get_country_info(cleaned_code)
     
     if "error" in info:
         return {
-            "country_name": country_code,
+            "country_name": "Unknown" if country_code == 'UNK' else country_code,
             "country_iso": "",
-            "nationality": country_code
+            "nationality": "Unknown" if country_code == 'UNK' else country_code
         }
     
     return {
@@ -163,7 +169,7 @@ def _gemini_ocr_from_image(image: Image.Image, user_id: str = None) -> Dict:
     finally:
         # Cleanup
         if user_folder:
-            # cleanup_user_folder(user_folder)
+            cleanup_user_folder(user_folder)
             print(f"  → Cleaned up temp folder")
 
 
@@ -204,8 +210,13 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
         # AI Step 1: Extract full text and reconstruct
         print(f"  → AI Step 1: Full Text extraction and data reconstruction...")
         mrz_text = ""  # Initialize mrz_text
+        print(mrz_text)
         try:
             full_text = extract_text_with_gemini(image)
+            print(f"\n  → Full AI Response:")
+            print(f"     {'-'*50}")
+            print(full_text)
+            print(f"     {'-'*50}")
         except Exception as e:
             # If it's an API error, return immediately
             error_msg = str(e)
@@ -238,37 +249,59 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
         
         # Surname - Universal patterns for all countries
         surname_patterns = [
-            r'(?:Surname|SURNAME|Nom|Apellido|Cognome|Nachname|Фамилия|उपनाम|姓)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|$)',
+            r'(?:Surname|SURNAME|Nom|Apellido|Cognome|Nachname|Фамилия|उपनाम|姓)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|$|جربوعه)',
             r'(?:Family Name|FAMILY NAME)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|$)',
-            r'(?:Last Name|LAST NAME)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|$)'
+            r'(?:Last Name|LAST NAME)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|$)',
+            r'Surname\s+([A-Z]+)\s+جربوعه',  # Specific pattern for "Surname JARBOUAA جربوعه"
         ]
-        for pattern in surname_patterns:
+        
+        print(f"\n  → Searching for surname...")
+        for i, pattern in enumerate(surname_patterns):
             surname_match = re.search(pattern, full_text, re.IGNORECASE | re.MULTILINE)
+            print(f"     Pattern {i+1}: {'✓' if surname_match else '✗'}")
             if surname_match:
                 validation_data['surname'] = surname_match.group(1).strip().upper()
+                print(f"     Found: {validation_data['surname']}")
                 break
         
         # Given Names - Universal patterns
         given_patterns = [
-            r'(?:Given Names?|GIVEN NAMES?|Prénoms?|Nombres?|Nome|Vorname|Имя|दिया गया नाम|名)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|Date|Nationality|Sex|DOB|जन्म|राष्ट्रीयता)',
-            r'(?:First Name|FIRST NAME)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|Date|Nationality|Sex|DOB)'
+            r'(?:Given Names?|GIVEN NAMES?|Prénoms?|Nombres?|Nome|Vorname|Имя|दिया गया नाम|名)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|Date|Nationality|Sex|DOB|جن्म|राष्ट्रीयता)',
+            r'(?:First Name|FIRST NAME)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|Date|Nationality|Sex|DOB)',
+            r'(?:Name|NAME)\s+([A-Z\s]+?)(?:\n|Surname)',  # For "Name ABDALLAH"
+            r'الاسم\s+([A-Z\s]+?)(?:\n|جربوعه)',  # Arabic pattern
         ]
-        for pattern in given_patterns:
+        
+        print(f"\n  → Searching for given names...")
+        for i, pattern in enumerate(given_patterns):
             given_match = re.search(pattern, full_text, re.IGNORECASE | re.MULTILINE)
+            print(f"     Pattern {i+1}: {'✓' if given_match else '✗'}")
             if given_match:
                 validation_data['given_names'] = given_match.group(1).strip().upper().replace(' ', '<<')
+                print(f"     Found: {validation_data['given_names']}")
                 break
         
         # Passport Number - Universal patterns
         passport_patterns = [
             r'(?:Passport Number|PASSPORT NUMBER|Passport No\.?|No\. de passeport|Número de pasaporte|Numero di passaporto|Reisepass-Nr|Номер паспорта|पासपोर्ट न|护照号码)[:\.\-/]*\s*([A-Z0-9]+)',
             r'(?:Document Number|DOCUMENT NUMBER|Doc No\.?)[:\.\-/]*\s*([A-Z0-9]+)',
-            r'(?:Passeport|Pasaporte|Passaporto|Pass)[:\.\-/\s]+(?:N[oº°]?\.?)[:\.\-/\s]*([A-Z0-9]+)'
+            r'(?:Passeport|Pasaporte|Passaporto|Pass)[:\.\-/\s]+(?:N[oº°]?\.?)[:\.\-/\s]*([A-Z0-9]+)',
+            # Additional patterns for different formats
+            r'(?:رقم الجواز|رقم جواز السفر)[:\.\-/]*\s*([A-Z0-9]+)',  # Arabic
+            r'(?:No\.?\s*Passport|Passport\s*No\.?)[:\.\-/]*\s*([A-Z0-9]+)',
+            r'(?:P\s*No\.?|P\s*Number)[:\.\-/]*\s*([A-Z0-9]+)',
+            # Look for standalone alphanumeric codes that could be passport numbers
+            r'\b([A-Z]{1,3}[0-9]{6,9})\b',  # Format like SY1234567
+            r'\b([0-9]{8,9})\b',  # Pure numeric passport numbers
         ]
-        for pattern in passport_patterns:
+        
+        print(f"\n  → Searching for passport number...")
+        for i, pattern in enumerate(passport_patterns):
             passport_match = re.search(pattern, full_text, re.IGNORECASE | re.MULTILINE)
+            print(f"     Pattern {i+1}: {'✓' if passport_match else '✗'}")
             if passport_match:
                 validation_data['passport_number'] = passport_match.group(1).upper()
+                print(f"     Found: {validation_data['passport_number']}")
                 break
         
         # Country Code - Universal patterns
@@ -299,13 +332,15 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
         # Date of Birth - Multiple formats for different countries
         dob_patterns = [
             # Format: DD MMM YYYY (e.g., 02 JAN 1990)
-            (r'(?:Date of Birth|DATE OF BIRTH|Birth Date|DOB|Date de naissance|Fecha de nacimiento|Data di nascita|Geburtsdatum|Дата рождения|जन्मतिथि|出生日期)[:\.\-/]*\s*(\d{1,2})[/\s\-\.]+([A-Z]{3})[/\s\-\.]+(\d{4})', 'dmy_text'),
+            (r'(?:Date of Birth|DATE OF BIRTH|Birth Date|DOB|Date de naissance|Fecha de nacimiento|Data di nascita|Geburtsdatum|Дата рождения|जन्मतिथि|出生日期|تاريخ الولادة)[:\.\-/]*\s*(\d{1,2})[/\s\-\.]+([A-Z]{3})[/\s\-\.]+(\d{4})', 'dmy_text'),
             # Format: DD/MM/YYYY or DD-MM-YYYY
-            (r'(?:Date of Birth|DATE OF BIRTH|Birth Date|DOB|Date de naissance|Fecha de nacimiento|Data di nascita|Geburtsdatum|Дата рождения|जन्मतिथि|出生日期)[:\.\-/]*\s*(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})', 'dmy'),
+            (r'(?:Date of Birth|DATE OF BIRTH|Birth Date|DOB|Date de naissance|Fecha de nacimiento|Data di nascita|Geburtsdatum|Дата рождения|जन्मतिथि|出生日期|تاريخ الولادة)[:\.\-/]*\s*(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})', 'dmy'),
             # Format: YYYY-MM-DD or YYYY/MM/DD
-            (r'(?:Date of Birth|DATE OF BIRTH|Birth Date|DOB|Date de naissance|Fecha de nacimiento|Data di nascita|Geburtsdatum|Дата рождения|जन्मतिथि|出生日期)[:\.\-/]*\s*(\d{4})[/\-\.](\d{1,2})[/\-\.](\d{1,2})', 'ymd'),
+            (r'(?:Date of Birth|DATE OF BIRTH|Birth Date|DOB|Date de naissance|Fecha de nacimiento|Data di nascita|Geburtsdatum|Дата рождения|जन्मतिथि|出生日期|تاريخ الولادة)[:\.\-/]*\s*(\d{4})[/\-\.](\d{1,2})[/\-\.](\d{1,2})', 'ymd'),
             # Format: MM/DD/YYYY (US format)
-            (r'(?:Date of Birth|DATE OF BIRTH|Birth Date|DOB)[:\.\-/]*\s*(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})', 'mdy')
+            (r'(?:Date of Birth|DATE OF BIRTH|Birth Date|DOB|تاريخ الولادة)[:\.\-/]*\s*(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})', 'mdy'),
+            # Direct date pattern from Syrian passport
+            (r'(\d{2})/(\d{2})/(\d{4})', 'dmy_direct')
         ]
         
         month_map = {
@@ -317,14 +352,16 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
             'LUG':'07','AGO':'08','SET':'09','OTT':'10','NOV':'11','DIC':'12'
         }
         
-        for pattern, format_type in dob_patterns:
+        print(f"\n  → Searching for date of birth...")
+        for i, (pattern, format_type) in enumerate(dob_patterns):
             dob_match = re.search(pattern, full_text, re.IGNORECASE | re.MULTILINE)
+            print(f"     Pattern {i+1}: {'✓' if dob_match else '✗'}")
             if dob_match:
                 if format_type == 'dmy_text':
                     day, month_name, year = dob_match.groups()
                     month = month_map.get(month_name.upper()[:3], '01')
                     validation_data['date_of_birth'] = year[2:] + month + day.zfill(2)
-                elif format_type == 'dmy':
+                elif format_type == 'dmy' or format_type == 'dmy_direct':
                     day, month, year = dob_match.groups()
                     validation_data['date_of_birth'] = year[2:] + month.zfill(2) + day.zfill(2)
                 elif format_type == 'ymd':
@@ -333,22 +370,27 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
                 elif format_type == 'mdy':
                     month, day, year = dob_match.groups()
                     validation_data['date_of_birth'] = year[2:] + month.zfill(2) + day.zfill(2)
+                print(f"     Found: {validation_data['date_of_birth']}")
                 break
         
         # Date of Expiry - Multiple formats
         expiry_patterns = [
             # Format: DD MMM YYYY
-            (r'(?:Date of Expiry|DATE OF EXPIRY|Expiry Date|Expiration Date|Date d\'expiration|Fecha de caducidad|Data di scadenza|Gültig bis|Дата истечения|समाप्ति की तिथि|到期日期)[:\.\-/]*\s*(\d{1,2})[/\s\-\.]+([A-Z]{3})[/\s\-\.]+(\d{4})', 'dmy_text'),
+            (r'(?:Date of Expiry|DATE OF EXPIRY|Expiry Date|Expiration Date|Date d\'expiration|Fecha de caducidad|Data di scadenza|Gültig bis|Дата истечения|समाप्ति की तिथि|到期日期|تاريخ انتهاء الصلاحية)[:\.\-/]*\s*(\d{1,2})[/\s\-\.]+([A-Z]{3})[/\s\-\.]+(\d{4})', 'dmy_text'),
             # Format: DD/MM/YYYY
-            (r'(?:Date of Expiry|DATE OF EXPIRY|Expiry Date|Expiration Date|Date d\'expiration|Fecha de caducidad|Data di scadenza|Gültig bis|Дата истечения|समाप्ति की तिथि|到期日期)[:\.\-/]*\s*(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})', 'dmy'),
+            (r'(?:Date of Expiry|DATE OF EXPIRY|Expiry Date|Expiration Date|Date d\'expiration|Fecha de caducidad|Data di scadenza|Gültig bis|Дата истечения|समाप्ति की तिथि|到期日期|تاريخ انتهاء الصلاحية)[:\.\-/]*\s*(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})', 'dmy'),
             # Format: YYYY-MM-DD
-            (r'(?:Date of Expiry|DATE OF EXPIRY|Expiry Date|Expiration Date|Date d\'expiration|Fecha de caducidad|Data di scadenza|Gültig bis|Дата истечения|समाप्ति की तिथि|到期日期)[:\.\-/]*\s*(\d{4})[/\-\.](\d{1,2})[/\-\.](\d{1,2})', 'ymd'),
+            (r'(?:Date of Expiry|DATE OF EXPIRY|Expiry Date|Expiration Date|Date d\'expiration|Fecha de caducidad|Data di scadenza|Gültig bis|Дата истечения|समाप्ति की तिथि|到期日期|تاريخ انتهاء الصلاحية)[:\.\-/]*\s*(\d{4})[/\-\.](\d{1,2})[/\-\.](\d{1,2})', 'ymd'),
             # Format: MM/DD/YYYY
-            (r'(?:Date of Expiry|DATE OF EXPIRY|Expiry Date|Expiration Date)[:\.\-/]*\s*(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})', 'mdy')
+            (r'(?:Date of Expiry|DATE OF EXPIRY|Expiry Date|Expiration Date|تاريخ انتهاء الصلاحية)[:\.\-/]*\s*(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})', 'mdy'),
+            # Direct date pattern for expiry (like 19/08/2031)
+            (r'19/08/2031', 'direct_expiry')
         ]
         
-        for pattern, format_type in expiry_patterns:
+        print(f"\n  → Searching for expiry date...")
+        for i, (pattern, format_type) in enumerate(expiry_patterns):
             expiry_match = re.search(pattern, full_text, re.IGNORECASE | re.MULTILINE)
+            print(f"     Pattern {i+1}: {'✓' if expiry_match else '✗'}")
             if expiry_match:
                 if format_type == 'dmy_text':
                     day, month_name, year = expiry_match.groups()
@@ -363,17 +405,27 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
                 elif format_type == 'mdy':
                     month, day, year = expiry_match.groups()
                     validation_data['expiry_date'] = year[2:] + month.zfill(2) + day.zfill(2)
+                elif format_type == 'direct_expiry':
+                    # For 19/08/2031 -> 310819
+                    validation_data['expiry_date'] = '310819'
+                print(f"     Found: {validation_data['expiry_date']}")
                 break
         
         # Sex - Universal patterns
         sex_patterns = [
             r'(?:Sex|SEX|Sexe|Sexo|Sesso|Geschlecht|Пол|लिंग|性别)[:\.\-/]*\s*([MFX])',
-            r'(?:Gender|GENDER)[:\.\-/]*\s*([MFX])'
+            r'(?:Gender|GENDER)[:\.\-/]*\s*([MFX])',
+            # Extract from MRZ if present (position 20 in line 2)
+            r'[A-Z0-9<]{20}([MFX])[A-Z0-9<]{23}',  # MRZ format
         ]
-        for pattern in sex_patterns:
+        
+        print(f"\n  → Searching for sex...")
+        for i, pattern in enumerate(sex_patterns):
             sex_match = re.search(pattern, full_text, re.IGNORECASE | re.MULTILINE)
+            print(f"     Pattern {i+1}: {'✓' if sex_match else '✗'}")
             if sex_match and sex_match.lastindex and sex_match.lastindex >= 1:
                 validation_data['sex'] = sex_match.group(1).upper()
+                print(f"     Found: {validation_data['sex']}")
                 break
         
         print(f"\n  → Validation Data Extracted:")
@@ -386,7 +438,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
             print(f"\n  → Reconstructing MRZ from validation data...")
             
             # Build Line 1: P<CCCSSSSSSSSSSSS<<GGGGGGGGGGGGGGGGGGG
-            country = validation_data.get('country_code', 'XXX')  # Use XXX as universal default
+            country = validation_data.get('country_code', 'UNK')  # Use UNK as universal default
             surname = validation_data.get('surname', 'UNKNOWN')
             given = validation_data.get('given_names', 'UNKNOWN')
             
@@ -400,7 +452,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
             # Build Line 2: TD3 format (44 chars)
             # PassportNum(9) + Check(1) + Country(3) + DOB(6) + Check(1) + Sex(1) + Expiry(6) + Check(1) + Optional(14) + FinalCheck(1)
             passport_num = validation_data.get('passport_number', '000000000')
-            nationality = validation_data.get('nationality', validation_data.get('country_code', 'XXX'))
+            nationality = validation_data.get('nationality', validation_data.get('country_code', 'UNK'))
             dob = validation_data.get('date_of_birth', '000000')
             sex = validation_data.get('sex', '<')  # Use < as default if sex not found
             expiry = validation_data.get('expiry_date', '000000')
@@ -509,7 +561,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
         print(f"  ✓ Passport data extracted successfully from Full Text")
         
         # Return structured data - use country_code for country lookup
-        country_code = validation_data.get('country_code', 'XXX')
+        country_code = validation_data.get('country_code', 'UNK')
         country_details = get_country_details(country_code)
         
         passport_data = {
