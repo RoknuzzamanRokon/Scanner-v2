@@ -90,10 +90,11 @@ def decode_td3_mrz_lines(line1: str, line2: str):
         # Decode Line 1: DOC_CODE + COUNTRY_CODE + SURNAME<<GIVEN_NAMES
         # Handle different document code formats
         if line1.startswith('P<'):
-            document_code = 'P<'
+            document_code = 'P'         # Return just 'P' instead of 'P<'
             issuer_code = line1[2:5]    # Position 2-4
             name_section = line1[5:44]  # Position 5-43
         elif line1[0:2] in VALID_PASSPORT_CODES:
+            # For PO, PD, PN, PS - return the full code
             document_code = line1[0:2]  # Position 0-1
             issuer_code = line1[2:5]    # Position 2-4
             name_section = line1[5:44]  # Position 5-43
@@ -117,16 +118,28 @@ def decode_td3_mrz_lines(line1: str, line2: str):
         passport_check = line2[9:10]                             # Position 9
         nationality_code = line2[10:13]                          # Position 10-12
         birth_date = line2[13:19]                                # Position 13-18
+        
+        # Clean birth date - remove any non-digit characters and pad if needed
+        birth_date_clean = ''.join(c for c in birth_date if c.isdigit())
+        if len(birth_date_clean) < 6:
+            birth_date_clean = birth_date_clean.ljust(6, '0')
+        birth_date = birth_date_clean[:6]
         birth_check = line2[19:20]                               # Position 19
         sex = line2[20:21]                                       # Position 20
         expiry_date = line2[21:27]                               # Position 21-26
+        
+        # Clean expiry date - remove any non-digit characters and pad if needed
+        expiry_date_clean = ''.join(c for c in expiry_date if c.isdigit())
+        if len(expiry_date_clean) < 6:
+            expiry_date_clean = expiry_date_clean.ljust(6, '0')
+        expiry_date = expiry_date_clean[:6]
         expiry_check = line2[27:28]                              # Position 27
         personal_number = line2[28:42].replace('<', '').strip()  # Position 28-41
         personal_check = line2[42:43]                            # Position 42
         final_check = line2[43:44]                               # Position 43
         
         # Format dates with proper year conversion
-        if len(birth_date) == 6:
+        if len(birth_date) == 6 and birth_date.isdigit():
             birth_year_2digit = int(birth_date[0:2])
             birth_month = birth_date[2:4]
             birth_day = birth_date[4:6]
@@ -148,9 +161,10 @@ def decode_td3_mrz_lines(line1: str, line2: str):
             
             birth_date_formatted = f"{birth_full_year}-{birth_month}-{birth_day}"
         else:
+            # Handle non-numeric or malformed birth dates
             birth_date_formatted = birth_date
         
-        if len(expiry_date) == 6:
+        if len(expiry_date) == 6 and expiry_date.isdigit():
             expiry_year_2digit = int(expiry_date[0:2])
             expiry_month = expiry_date[2:4]
             expiry_day = expiry_date[4:6]
@@ -166,7 +180,18 @@ def decode_td3_mrz_lines(line1: str, line2: str):
             
             expiry_date_formatted = f"{expiry_full_year}-{expiry_month}-{expiry_day}"
         else:
+            # Handle non-numeric or malformed expiry dates
             expiry_date_formatted = expiry_date
+        
+        # Create cleaned MRZ lines with corrected dates for validation
+        # Reconstruct line2 with cleaned birth_date and expiry_date
+        line2_cleaned = (
+            line2[0:13] +           # Passport number + check + nationality (positions 0-12)
+            birth_date +            # Cleaned birth date (positions 13-18)
+            line2[19:21] +          # Birth check + sex (positions 19-20)
+            expiry_date +           # Cleaned expiry date (positions 21-26)
+            line2[27:]              # Rest of line (positions 27-43)
+        )
         
         decoded_details = {
             'mrz_type': 'TD3',
@@ -185,7 +210,7 @@ def decode_td3_mrz_lines(line1: str, line2: str):
             'personal_number': personal_number,
             'personal_number_checkdigit': personal_check,
             'final_checkdigit': final_check,
-            'mrz_text': f"{line1}\n{line2}",
+            'mrz_text': f"{line1}\n{line2_cleaned}",  # Use cleaned line2
             'status': 'SUCCESS'
         }
         
@@ -492,6 +517,8 @@ def process_passport_image(image_path):
                         print(f"  Sex: {decoded_details.get('sex', 'N/A')}")
                         print(f"  Expiry Date: {decoded_details.get('expiry_date', 'N/A')}")
                         print(f"  Status: {decoded_details.get('status', 'N/A')}")
+                        print(f"  Status: {decoded_details.get('mrz_text', 'N/A')}")
+                        
                 else:
                     print(f"\n⚠️ Could not create TD3 compliant MRZ")
                     print(f"Raw MRZ length: {original_length}")
@@ -587,6 +614,8 @@ def process_passport_image(image_path):
                 mrz_for_validation = mrz_data.get('raw_text', '') if mrz_data else ''
             
             if mrz_for_validation:
+                
+                print(f"🔍 MRZ text being validated: {repr(mrz_for_validation)}")
                 # Import and use the passport field validation function
                 from passport_check import validate_passport_fields
                 
