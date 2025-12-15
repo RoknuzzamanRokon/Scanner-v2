@@ -17,7 +17,8 @@ def scan_passport(
     image_url: Optional[str] = None,
     image_base64: Optional[str] = None,
     document_type: str = "passport",
-    use_gemini: bool = True
+    use_gemini: bool = True,
+    step_config_override: Optional[Dict[str, bool]] = None
 ) -> Dict:
     """
     Scan passport image and extract MRZ data using multi-layered fallback system
@@ -109,7 +110,7 @@ def scan_passport(
         ai_result = {"error": "Step not executed", "success": False}
         
         # STEP 1: FastMRZ Fallback Validation
-        if is_step_enabled("STEP1"):
+        if is_step_enabled("STEP1", step_config_override):
             print("\n" + "-"*60)
             print("🔍 STEP 1: FastMRZ Fallback Validation")
             print("-"*60)
@@ -154,7 +155,7 @@ def scan_passport(
             working_process_step["step1_fastmrz"] = "Skipped (Disabled)"
         
         # STEP 2: PassportEye Fallback Validation
-        if is_step_enabled("STEP2"):
+        if is_step_enabled("STEP2", step_config_override):
             print("\n" + "-"*60)
             print("🔍 STEP 2: PassportEye Fallback Validation")
             print("-"*60)
@@ -201,7 +202,7 @@ def scan_passport(
 
 
         # STEP 3: EasyOCR Fallback Validation
-        if is_step_enabled("STEP3"):
+        if is_step_enabled("STEP3", step_config_override):
             print("\n" + "-"*60)
             print("🔍 STEP 3: EasyOCR Fallback Validation")
             print("-"*60)
@@ -247,7 +248,7 @@ def scan_passport(
             working_process_step["step3_easyocr"] = "Skipped (Disabled)"
         
         # STEP 4: Tesseract OCR Fallback Validation
-        if is_step_enabled("STEP4"):
+        if is_step_enabled("STEP4", step_config_override):
             print("\n" + "-"*60)
             print("🔍 STEP 4: Tesseract OCR Fallback Validation")
             print("-"*60)
@@ -305,7 +306,7 @@ def scan_passport(
             working_process_step["step4_tesseract"] = "Skipped (Disabled)"
         
         # STEP 5: Passport Validation Checker  
-        if is_step_enabled("STEP5"):
+        if is_step_enabled("STEP5", step_config_override):
             print("\n" + "-"*60)
             print("🔍 STEP 5: Passport Validation Checker")
             print("-"*60)
@@ -369,7 +370,7 @@ def scan_passport(
 
 
         # STEP 6: AI Parser (Final Fallback) - Only if AI=ON and Step Enabled
-        if use_gemini and is_step_enabled("STEP6"):
+        if use_gemini and is_step_enabled("STEP6", step_config_override):
             print("\n" + "-"*60)
             print("🤖 STEP 6: AI Parser (Gemini - Final Fallback)")
             print("-"*60)
@@ -415,7 +416,7 @@ def scan_passport(
             if not use_gemini:
                 print("\n⏭ STEP 6: AI Parser - SKIPPED (AI=OFF)")
                 working_process_step["step6_ai_parser"] = "Skipped (AI=OFF)"
-            elif not is_step_enabled("STEP6"):
+            elif not is_step_enabled("STEP6", step_config_override):
                 print("\n⏭ STEP 6: AI Parser - SKIPPED (DISABLED)")
                 working_process_step["step6_ai_parser"] = "Skipped (Disabled)"
             else:

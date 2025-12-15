@@ -3,7 +3,7 @@ Function Handler Switch System
 Allows enabling/disabling specific steps in the passport scanning process
 """
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -149,16 +149,19 @@ class StepController:
 step_controller = StepController()
 
 
-def is_step_enabled(step: str) -> bool:
+def is_step_enabled(step: str, override_config: Optional[Dict[str, bool]] = None) -> bool:
     """
     Check if a step is enabled (convenience function)
     
     Args:
         step: Step name (e.g., "STEP1", "STEP2", etc.)
+        override_config: Optional dictionary to override step configuration for this check
         
     Returns:
         True if step is enabled, False otherwise
     """
+    if override_config and step.upper() in override_config:
+        return override_config[step.upper()]
     return step_controller.is_enabled(step)
 
 

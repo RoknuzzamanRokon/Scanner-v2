@@ -8,6 +8,12 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, List
 from config import config
 from scanner import scan_passport
+from function_handler_switch import (
+    get_step_status, 
+    enable_step, 
+    disable_step, 
+    save_step_config
+)
 
 
 # Initialize FastAPI app
@@ -34,6 +40,7 @@ class ScanRequest(BaseModel):
     documents_image_url: Optional[str] = Field(None, description="URL of the document image or PDF (required if image_type='file')")
     image_base64: Optional[str] = Field(None, description="Base64 encoded image or PDF data (required if image_type='base64'). PDFs will be auto-converted to images.")
     documents_type: str = Field(default="passport", description="Type of document: passport, id_card, visa")
+    step_config: Optional[Dict[str, bool]] = Field(None, description="Optional step configuration override for this scan (e.g., {'STEP1': true, 'STEP2': false, ...})")
     
     @field_validator('image_type')
     @classmethod
@@ -91,6 +98,18 @@ class ScanResponse(BaseModel):
     class Config:
         # Allow extra fields in the response
         extra = "allow"
+
+
+class StepConfigRequest(BaseModel):
+    """Request model for step configuration"""
+    steps: Dict[str, bool] = Field(..., description="Dictionary of step names and their enabled status")
+
+
+class StepConfigResponse(BaseModel):
+    """Response model for step configuration"""
+    success: bool
+    steps: Dict[str, bool]
+    message: str = ""
 
 
 # API endpoints
@@ -180,14 +199,16 @@ async def scan_document(
             result = scan_passport(
                 image_url=request.documents_image_url,
                 document_type=request.documents_type,
-                use_gemini=use_gemini
+                use_gemini=use_gemini,
+                step_config_override=request.step_config
             )
         elif request.image_type == "base64":
             # Base64-encoded image
             result = scan_passport(
                 image_base64=request.image_base64,
                 document_type=request.documents_type,
-                use_gemini=use_gemini
+                use_gemini=use_gemini,
+                step_config_override=request.step_config
             )
         else:
             raise HTTPException(
@@ -211,6 +232,80 @@ async def scan_document(
         raise HTTPException(
             status_code=500,
             detail=f"Error processing document: {str(e)}"
+        )
+
+
+@app.get("/step-config", response_model=StepConfigResponse)
+async def get_step_config():
+    """
+    Get current step configuration
+    
+    Returns:
+        StepConfigResponse with current step status
+    """
+    try:
+        steps = get_step_status()
+        return StepConfigResponse(
+            success=True,
+            steps=steps,
+            message="Step configuration retrieved successfully"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving step configuration: {str(e)}"
+        )
+
+
+@app.post("/step-config", response_model=StepConfigResponse)
+async def update_step_config(request: StepConfigRequest):
+    """
+    Update step configuration
+    
+    Args:
+        request: StepConfigRequest with new step configuration
+        
+    Returns:
+        StepConfigResponse with updated step status
+        
+    Example:
+        ```json
+        {
+            "steps": {
+                "STEP1": true,
+                "STEP2": true,
+                "STEP3": false,
+                "STEP4": false,
+                "STEP5": true,
+                "STEP6": false
+            }
+        }
+        ```
+    """
+    try:
+        # Update each step based on the request
+        for step_name, enabled in request.steps.items():
+            step_name = step_name.upper()
+            if step_name in ["STEP1", "STEP2", "STEP3", "STEP4", "STEP5", "STEP6"]:
+                if enabled:
+                    enable_step(step_name)
+                else:
+                    disable_step(step_name)
+        
+        # Save configuration to file
+        save_step_config()
+        
+        # Return updated configuration
+        updated_steps = get_step_status()
+        return StepConfigResponse(
+            success=True,
+            steps=updated_steps,
+            message="Step configuration updated successfully"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating step configuration: {str(e)}"
         )
 
 

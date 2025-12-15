@@ -1,1005 +1,1180 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document Scanner | Professional Test Interface</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%232563eb'/%3E%3Cpath d='M25 30h50v8H25zm0 15h50v8H25zm0 15h50v8H25z' fill='%23fff'/%3E%3Cpath d='M20 20h60v60H20z' fill='none' stroke='%23fff' stroke-width='4'/%3E%3C/svg%3E"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      :root {
+        --primary-color: #2563eb;
+        --primary-dark: #1d4ed8;
+        --secondary-color: #64748b;
+        --accent-color: #0ea5e9;
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --error-color: #ef4444;
+        --bg-color: #f8fafc;
+        --card-bg: #ffffff;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+          0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --radius: 8px;
+        --radius-lg: 12px;
+      }
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Document Scanner | Professional Test Interface</title>
-  <link rel="icon" type="image/svg+xml"
-    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%232563eb'/%3E%3Cpath d='M25 30h50v8H25zm0 15h50v8H25zm0 15h50v8H25z' fill='%23fff'/%3E%3Cpath d='M20 20h60v60H20z' fill='none' stroke='%23fff' stroke-width='4'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <style>
-    :root {
-      --primary-color: #2563eb;
-      --primary-dark: #1d4ed8;
-      --secondary-color: #64748b;
-      --accent-color: #0ea5e9;
-      --success-color: #10b981;
-      --warning-color: #f59e0b;
-      --error-color: #ef4444;
-      --bg-color: #f8fafc;
-      --card-bg: #ffffff;
-      --text-primary: #1e293b;
-      --text-secondary: #64748b;
-      --border-color: #e2e8f0;
-      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-        0 2px 4px -1px rgba(0, 0, 0, 0.06);
-      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-        0 4px 6px -2px rgba(0, 0, 0, 0.05);
-      --radius: 8px;
-      --radius-lg: 12px;
-    }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-        Roboto, Oxygen, Ubuntu, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-primary);
-      line-height: 1.5;
-      min-height: 100vh;
-      padding: 20px;
-    }
-
-    @media (max-width: 768px) {
       body {
-        padding: 10px;
-      }
-    }
-
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    /* Main Card Wrapper */
-    .main-card {
-      background: #ffffff;
-      border-radius: 16px;
-      padding: 32px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1),
-        0 2px 8px rgba(0, 0, 0, 0.06);
-      margin-bottom: 40px;
-    }
-
-    @media (max-width: 768px) {
-      .main-card {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, Oxygen, Ubuntu, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-primary);
+        line-height: 1.5;
+        min-height: 100vh;
         padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 20px;
       }
-    }
 
-    @media (max-width: 480px) {
+      @media (max-width: 768px) {
+        body {
+          padding: 10px;
+        }
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      /* Main Card Wrapper */
       .main-card {
-        padding: 16px;
-        border-radius: 8px;
-      }
-    }
-
-    /* Header Styles */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 40px;
-      padding: 20px 0;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .header-content {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .logo {
-      width: 48px;
-      height: 48px;
-      background: linear-gradient(135deg,
-          var(--primary-color),
-          var(--accent-color));
-      border-radius: var(--radius);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 24px;
-    }
-
-    .header-text h1 {
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--text-primary);
-      margin-bottom: 4px;
-    }
-
-    @media (max-width: 768px) {
-      .header-text h1 {
-        font-size: 22px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .header-text h1 {
-        font-size: 20px;
-      }
-    }
-
-    .header-text p {
-      font-size: 16px;
-      color: var(--text-secondary);
-    }
-
-    @media (max-width: 768px) {
-      .header-text p {
-        font-size: 14px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .header-text p {
-        font-size: 13px;
-      }
-    }
-
-    .api-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background-color: var(--card-bg);
-      padding: 10px 16px;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      font-weight: 500;
-    }
-
-    .status-indicator {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background-color: var(--success-color);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1;
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1),
+          0 2px 8px rgba(0, 0, 0, 0.06);
+        margin-bottom: 40px;
       }
 
-      50% {
-        opacity: 0.5;
-      }
-    }
-
-    /* Main Layout */
-    .main-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 30px;
-    }
-
-    @media (max-width: 1024px) {
-      .main-layout {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* Card Styles */
-    .card {
-      background-color: var(--card-bg);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow);
-      padding: 30px;
-      margin-bottom: 24px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .card:hover {
-      box-shadow: var(--shadow-lg);
-    }
-
-    @media (max-width: 768px) {
-      .card {
-        padding: 20px;
-        margin-bottom: 20px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .card {
-        padding: 16px;
-        margin-bottom: 16px;
-        border-radius: var(--radius);
-      }
-    }
-
-    .card-title {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    @media (max-width: 768px) {
-      .card-title {
-        font-size: 18px;
-        margin-bottom: 20px;
-        padding-bottom: 12px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .card-title {
-        font-size: 16px;
-        gap: 8px;
-      }
-    }
-
-    .card-title i {
-      color: var(--primary-color);
-    }
-
-    /* Input Section */
-    .input-group {
-      margin-bottom: 20px;
-    }
-
-    .input-label {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-    }
-
-    .input-label span {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .optional {
-      font-size: 12px;
-      color: var(--text-secondary);
-      font-weight: normal;
-    }
-
-    .input-field,
-    .select-field {
-      width: 100%;
-      padding: 14px 16px;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius);
-      font-size: 16px;
-      color: var(--text-primary);
-      background-color: white;
-      transition: all 0.2s;
-    }
-
-    @media (max-width: 768px) {
-
-      .input-field,
-      .select-field {
-        padding: 12px 14px;
-        font-size: 16px;
-        /* Keep 16px to prevent zoom on iOS */
-      }
-    }
-
-    .input-field:focus,
-    .select-field:focus {
-      outline: none;
-      border-color: var(--primary-color);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    }
-
-    .button-group {
-      display: flex;
-      gap: 12px;
-      margin-top: 30px;
-    }
-
-    .btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 14px 24px;
-      border: none;
-      border-radius: var(--radius);
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      flex: 1;
-      min-height: 48px;
-      /* Better touch target for mobile */
-    }
-
-    @media (max-width: 768px) {
-      .btn {
-        padding: 12px 20px;
-        font-size: 15px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .btn {
-        padding: 12px 16px;
-        font-size: 14px;
-        gap: 8px;
-      }
-    }
-
-    .btn-primary {
-      background-color: var(--primary-color);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background-color: var(--primary-dark);
-      transform: translateY(-2px);
-    }
-
-    .btn-secondary {
-      background-color: white;
-      color: var(--text-primary);
-      border: 1px solid var(--border-color);
-    }
-
-    .btn-secondary:hover {
-      background-color: #f8fafc;
-      border-color: var(--primary-color);
-    }
-
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none !important;
-    }
-
-    /* Input Method Selector */
-    .input-method-selector {
-      display: flex;
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-
-    .input-method-selector label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      padding: 8px 12px;
-      border-radius: var(--radius);
-      transition: background-color 0.2s;
-    }
-
-    .input-method-selector label:hover {
-      background-color: #f8fafc;
-    }
-
-    @media (max-width: 480px) {
-      .input-method-selector {
-        flex-direction: column;
-        gap: 12px;
+      @media (max-width: 768px) {
+        .main-card {
+          padding: 20px;
+          border-radius: 12px;
+          margin-bottom: 20px;
+        }
       }
 
-      .input-method-selector label {
-        padding: 10px 12px;
-        font-size: 14px;
-      }
-    }
-
-
-    /* Loading State */
-    .loading {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 60px 20px;
-    }
-
-    .loading.active {
-      display: flex;
-    }
-
-    .spinner {
-      width: 60px;
-      height: 60px;
-      border: 4px solid rgba(37, 99, 235, 0.1);
-      border-top: 4px solid var(--primary-color);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 20px;
-    }
-
-    @keyframes spin {
-      0% {
-        transform: rotate(0deg);
+      @media (max-width: 480px) {
+        .main-card {
+          padding: 16px;
+          border-radius: 8px;
+        }
       }
 
-      100% {
-        transform: rotate(360deg);
-      }
-    }
-
-    /* Result Section */
-    .result-section {
-      display: none;
-    }
-
-    .result-section.active {
-      display: block;
-    }
-
-    .result-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .result-badge {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 18px;
-      border-radius: 50px;
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-    .result-badge.success {
-      background-color: rgba(16, 185, 129, 0.1);
-      color: var(--success-color);
-    }
-
-    .result-badge.error {
-      background-color: rgba(239, 68, 68, 0.1);
-      color: var(--error-color);
-    }
-
-    .process-method {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 600;
-      margin-left: 10px;
-    }
-
-    .process-method.ai {
-      background-color: rgba(14, 165, 233, 0.1);
-      color: var(--accent-color);
-    }
-
-    .process-method.ocr {
-      background-color: rgba(245, 158, 11, 0.1);
-      color: var(--warning-color);
-    }
-
-    /* Data Grid */
-    .data-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
-      margin-bottom: 30px;
-    }
-
-    .data-item {
-      background-color: #f8fafc;
-      border-radius: var(--radius);
-      padding: 18px;
-      border-left: 4px solid var(--primary-color);
-      transition: transform 0.2s ease;
-    }
-
-    .data-item:hover {
-      transform: translateY(-2px);
-    }
-
-    .data-label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
-    }
-
-    .data-value {
-      font-size: 16px;
-      font-weight: 500;
-      color: var(--text-primary);
-      word-break: break-word;
-    }
-
-    .data-value.empty {
-      color: var(--text-secondary);
-      font-style: italic;
-    }
-
-    /* Folder Info */
-    .folder-info {
-      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 24px;
-      border: 1px solid rgba(14, 165, 233, 0.2);
-    }
-
-    .folder-info-title {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--accent-color);
-      margin-bottom: 12px;
-    }
-
-    .folder-path {
-      font-family: "SF Mono", Monaco, "Cascadia Mono", "Courier New",
-        monospace;
-      background-color: white;
-      padding: 12px;
-      border-radius: 6px;
-      font-size: 14px;
-      color: var(--text-primary);
-      margin-bottom: 16px;
-      overflow-x: auto;
-    }
-
-    .file-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .file-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background-color: white;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      color: var(--text-secondary);
-      border: 1px solid var(--border-color);
-    }
-
-    /* MRZ Section */
-    .mrz-section {
-      background-color: #1e293b;
-      border-radius: var(--radius);
-      padding: 24px;
-      margin-bottom: 24px;
-      font-family: "SF Mono", Monaco, "Cascadia Mono", "Courier New",
-        monospace;
-    }
-
-    .mrz-title {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: #94a3b8;
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 16px;
-    }
-
-    .mrz-line {
-      background-color: #0f172a;
-      padding: 12px;
-      margin: 8px 0;
-      border-radius: 6px;
-      letter-spacing: 1.5px;
-      font-size: 14px;
-      color: #e2e8f0;
-      overflow-x: auto;
-    }
-
-    /* Processing Steps */
-    .steps-section {
-      margin-top: 30px;
-    }
-
-    .step-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px;
-      margin-bottom: 12px;
-      background-color: #f8fafc;
-      border-radius: var(--radius);
-      border-left: 4px solid var(--primary-color);
-    }
-
-    .step-number {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      background-color: var(--primary-color);
-      color: white;
-      border-radius: 50%;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .step-content {
-      flex: 1;
-    }
-
-    .step-title {
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 4px;
-    }
-
-    .step-desc {
-      font-size: 14px;
-      color: var(--text-secondary);
-    }
-
-    /* Error Message */
-    .error-message {
-      background-color: rgba(239, 68, 68, 0.05);
-      border: 1px solid rgba(239, 68, 68, 0.2);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 24px;
-    }
-
-    .error-title {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--error-color);
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    .error-details {
-      color: var(--text-secondary);
-      font-size: 14px;
-    }
-
-    /* Stats */
-    .stats-container {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 30px;
-    }
-
-    .stat-card {
-      background-color: var(--card-bg);
-      border-radius: var(--radius);
-      padding: 20px;
-      text-align: center;
-      box-shadow: var(--shadow);
-    }
-
-    .stat-value {
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--primary-color);
-      margin-bottom: 4px;
-    }
-
-    .stat-label {
-      font-size: 14px;
-      color: var(--text-secondary);
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
+      /* Header Styles */
       .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 16px;
-        padding: 16px 0;
-        margin-bottom: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 40px;
+        padding: 20px 0;
+        border-bottom: 1px solid var(--border-color);
       }
 
       .header-content {
-        gap: 12px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
       }
 
       .logo {
-        width: 40px;
-        height: 40px;
-        font-size: 20px;
-      }
-
-      .api-status {
-        align-self: flex-start;
-        font-size: 13px;
-        padding: 8px 12px;
-      }
-
-      .button-group {
-        flex-direction: column;
-        gap: 10px;
-        margin-top: 20px;
-      }
-
-      .data-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
-
-      .stats-container {
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
-
-      .data-item {
-        padding: 14px;
-      }
-
-      .mrz-section {
-        padding: 16px;
-      }
-
-      .mrz-line {
-        font-size: 12px;
-        padding: 10px;
-        overflow-x: auto;
-      }
-
-      .folder-info {
-        padding: 16px;
-      }
-
-      .folder-path {
-        font-size: 12px;
-        padding: 10px;
-        word-break: break-all;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .header {
-        gap: 12px;
-        padding: 12px 0;
-        margin-bottom: 20px;
-      }
-
-      .logo {
-        width: 36px;
-        height: 36px;
-        font-size: 18px;
-      }
-
-      .api-status {
-        font-size: 12px;
-        padding: 6px 10px;
-      }
-
-      .status-indicator {
-        width: 8px;
-        height: 8px;
-      }
-
-      .button-group {
-        gap: 8px;
-        margin-top: 16px;
-      }
-
-      .result-badge {
-        font-size: 12px;
-        padding: 8px 12px;
-      }
-
-      .process-method {
-        font-size: 11px;
-        padding: 4px 8px;
-      }
-
-      .data-label {
-        font-size: 11px;
-      }
-
-      .data-value {
-        font-size: 14px;
-      }
-
-      .spinner {
-        width: 50px;
-        height: 50px;
-      }
-
-      .loading {
-        padding: 40px 10px;
-      }
-
-      .stat-card {
-        padding: 16px;
-      }
-
-      .stat-value {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(
+          135deg,
+          var(--primary-color),
+          var(--accent-color)
+        );
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
         font-size: 24px;
       }
 
-      .stat-label {
-        font-size: 13px;
+      .header-text h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 4px;
       }
 
-      .file-badge {
+      @media (max-width: 768px) {
+        .header-text h1 {
+          font-size: 22px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .header-text h1 {
+          font-size: 20px;
+        }
+      }
+
+      .header-text p {
+        font-size: 16px;
+        color: var(--text-secondary);
+      }
+
+      @media (max-width: 768px) {
+        .header-text p {
+          font-size: 14px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .header-text p {
+          font-size: 13px;
+        }
+      }
+
+      .api-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background-color: var(--card-bg);
+        padding: 10px 16px;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        font-weight: 500;
+      }
+
+      .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: var(--success-color);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      /* Main Layout */
+      .main-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+      }
+
+      @media (max-width: 1024px) {
+        .main-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Card Styles */
+      .card {
+        background-color: var(--card-bg);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        padding: 30px;
+        margin-bottom: 24px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .card:hover {
+        box-shadow: var(--shadow-lg);
+      }
+
+      @media (max-width: 768px) {
+        .card {
+          padding: 20px;
+          margin-bottom: 20px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .card {
+          padding: 16px;
+          margin-bottom: 16px;
+          border-radius: var(--radius);
+        }
+      }
+
+      .card-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      @media (max-width: 768px) {
+        .card-title {
+          font-size: 18px;
+          margin-bottom: 20px;
+          padding-bottom: 12px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .card-title {
+          font-size: 16px;
+          gap: 8px;
+        }
+      }
+
+      .card-title i {
+        color: var(--primary-color);
+      }
+
+      /* Input Section */
+      .input-group {
+        margin-bottom: 20px;
+      }
+
+      .input-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      .input-label span {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .optional {
         font-size: 12px;
-        padding: 6px 10px;
+        color: var(--text-secondary);
+        font-weight: normal;
       }
 
-      .step-item {
+      .input-field,
+      .select-field {
+        width: 100%;
+        padding: 14px 16px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        font-size: 16px;
+        color: var(--text-primary);
+        background-color: white;
+        transition: all 0.2s;
+      }
+
+      @media (max-width: 768px) {
+        .input-field,
+        .select-field {
+          padding: 12px 14px;
+          font-size: 16px;
+          /* Keep 16px to prevent zoom on iOS */
+        }
+      }
+
+      .input-field:focus,
+      .select-field:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+      }
+
+      .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 14px 24px;
+        border: none;
+        border-radius: var(--radius);
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex: 1;
+        min-height: 48px;
+        /* Better touch target for mobile */
+      }
+
+      @media (max-width: 768px) {
+        .btn {
+          padding: 12px 20px;
+          font-size: 15px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .btn {
+          padding: 12px 16px;
+          font-size: 14px;
+          gap: 8px;
+        }
+      }
+
+      .btn-primary {
+        background-color: var(--primary-color);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background-color: var(--primary-dark);
+        transform: translateY(-2px);
+      }
+
+      .btn-secondary {
+        background-color: white;
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+      }
+
+      .btn-secondary:hover {
+        background-color: #f8fafc;
+        border-color: var(--primary-color);
+      }
+
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+
+      /* Input Method Selector */
+      .input-method-selector {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .input-method-selector label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 8px 12px;
+        border-radius: var(--radius);
+        transition: background-color 0.2s;
+      }
+
+      .input-method-selector label:hover {
+        background-color: #f8fafc;
+      }
+
+      @media (max-width: 480px) {
+        .input-method-selector {
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .input-method-selector label {
+          padding: 10px 12px;
+          font-size: 14px;
+        }
+      }
+
+      /* Loading State */
+      .loading {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+      }
+
+      .loading.active {
+        display: flex;
+      }
+
+      .spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid rgba(37, 99, 235, 0.1);
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Result Section */
+      .result-section {
+        display: none;
+      }
+
+      .result-section.active {
+        display: block;
+      }
+
+      .result-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .result-badge {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 18px;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .result-badge.success {
+        background-color: rgba(16, 185, 129, 0.1);
+        color: var(--success-color);
+      }
+
+      .result-badge.error {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: var(--error-color);
+      }
+
+      .process-method {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-left: 10px;
+      }
+
+      .process-method.ai {
+        background-color: rgba(14, 165, 233, 0.1);
+        color: var(--accent-color);
+      }
+
+      .process-method.ocr {
+        background-color: rgba(245, 158, 11, 0.1);
+        color: var(--warning-color);
+      }
+
+      /* Data Grid */
+      .data-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+        margin-bottom: 30px;
+      }
+
+      .data-item {
+        background-color: #f8fafc;
+        border-radius: var(--radius);
+        padding: 18px;
+        border-left: 4px solid var(--primary-color);
+        transition: transform 0.2s ease;
+      }
+
+      .data-item:hover {
+        transform: translateY(-2px);
+      }
+
+      .data-label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
+
+      .data-value {
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--text-primary);
+        word-break: break-word;
+      }
+
+      .data-value.empty {
+        color: var(--text-secondary);
+        font-style: italic;
+      }
+
+      /* Folder Info */
+      .folder-info {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border-radius: var(--radius);
+        padding: 20px;
+        margin-bottom: 24px;
+        border: 1px solid rgba(14, 165, 233, 0.2);
+      }
+
+      .folder-info-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--accent-color);
+        margin-bottom: 12px;
+      }
+
+      .folder-path {
+        font-family: "SF Mono", Monaco, "Cascadia Mono", "Courier New",
+          monospace;
+        background-color: white;
         padding: 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        color: var(--text-primary);
+        margin-bottom: 16px;
+        overflow-x: auto;
+      }
+
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
         gap: 10px;
       }
 
-      .step-number {
-        width: 24px;
-        height: 24px;
-        font-size: 12px;
-      }
-
-      .step-title {
-        font-size: 14px;
-      }
-
-      .step-desc {
+      .file-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background-color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
         font-size: 13px;
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
       }
 
+      /* MRZ Section */
       .mrz-section {
-        padding: 12px;
+        background-color: #1e293b;
+        border-radius: var(--radius);
+        padding: 24px;
+        margin-bottom: 24px;
+        font-family: "SF Mono", Monaco, "Cascadia Mono", "Courier New",
+          monospace;
       }
 
       .mrz-title {
-        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #94a3b8;
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 16px;
       }
 
       .mrz-line {
-        font-size: 11px;
-        padding: 8px;
-        letter-spacing: 1px;
-      }
-    }
-
-    /* Footer */
-    .footer {
-      text-align: center;
-      margin-top: 40px;
-      padding: 20px;
-      color: var(--text-secondary);
-      font-size: 14px;
-    }
-
-    @media (max-width: 768px) {
-      .footer {
-        margin-top: 30px;
-        padding: 16px;
-        font-size: 13px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .footer {
-        margin-top: 20px;
+        background-color: #0f172a;
         padding: 12px;
+        margin: 8px 0;
+        border-radius: 6px;
+        letter-spacing: 1.5px;
+        font-size: 14px;
+        color: #e2e8f0;
+        overflow-x: auto;
+      }
+
+      /* Processing Steps */
+      .steps-section {
+        margin-top: 30px;
+      }
+
+      .step-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        background-color: #f8fafc;
+        border-radius: var(--radius);
+        border-left: 4px solid var(--primary-color);
+      }
+
+      .step-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .step-content {
+        flex: 1;
+      }
+
+      .step-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+      }
+
+      .step-desc {
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      /* Error Message */
+      .error-message {
+        background-color: rgba(239, 68, 68, 0.05);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        border-radius: var(--radius);
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+
+      .error-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--error-color);
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .error-details {
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      /* Stats */
+      .stats-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 30px;
+      }
+
+      .stat-card {
+        background-color: var(--card-bg);
+        border-radius: var(--radius);
+        padding: 20px;
+        text-align: center;
+        box-shadow: var(--shadow);
+      }
+
+      .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 4px;
+      }
+
+      .stat-label {
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 16px;
+          padding: 16px 0;
+          margin-bottom: 24px;
+        }
+
+        .header-content {
+          gap: 12px;
+        }
+
+        .logo {
+          width: 40px;
+          height: 40px;
+          font-size: 20px;
+        }
+
+        .api-status {
+          align-self: flex-start;
+          font-size: 13px;
+          padding: 8px 12px;
+        }
+
+        .button-group {
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 20px;
+        }
+
+        .data-grid {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .stats-container {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .data-item {
+          padding: 14px;
+        }
+
+        .mrz-section {
+          padding: 16px;
+        }
+
+        .mrz-line {
+          font-size: 12px;
+          padding: 10px;
+          overflow-x: auto;
+        }
+
+        .folder-info {
+          padding: 16px;
+        }
+
+        .folder-path {
+          font-size: 12px;
+          padding: 10px;
+          word-break: break-all;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .header {
+          gap: 12px;
+          padding: 12px 0;
+          margin-bottom: 20px;
+        }
+
+        .logo {
+          width: 36px;
+          height: 36px;
+          font-size: 18px;
+        }
+
+        .api-status {
+          font-size: 12px;
+          padding: 6px 10px;
+        }
+
+        .status-indicator {
+          width: 8px;
+          height: 8px;
+        }
+
+        .button-group {
+          gap: 8px;
+          margin-top: 16px;
+        }
+
+        .result-badge {
+          font-size: 12px;
+          padding: 8px 12px;
+        }
+
+        .process-method {
+          font-size: 11px;
+          padding: 4px 8px;
+        }
+
+        .data-label {
+          font-size: 11px;
+        }
+
+        .data-value {
+          font-size: 14px;
+        }
+
+        .spinner {
+          width: 50px;
+          height: 50px;
+        }
+
+        .loading {
+          padding: 40px 10px;
+        }
+
+        .stat-card {
+          padding: 16px;
+        }
+
+        .stat-value {
+          font-size: 24px;
+        }
+
+        .stat-label {
+          font-size: 13px;
+        }
+
+        .file-badge {
+          font-size: 12px;
+          padding: 6px 10px;
+        }
+
+        .step-item {
+          padding: 12px;
+          gap: 10px;
+        }
+
+        .step-number {
+          width: 24px;
+          height: 24px;
+          font-size: 12px;
+        }
+
+        .step-title {
+          font-size: 14px;
+        }
+
+        .step-desc {
+          font-size: 13px;
+        }
+
+        .mrz-section {
+          padding: 12px;
+        }
+
+        .mrz-title {
+          font-size: 14px;
+        }
+
+        .mrz-line {
+          font-size: 11px;
+          padding: 8px;
+          letter-spacing: 1px;
+        }
+      }
+
+      /* Step Configuration Styles */
+      .step-config-section {
+        margin-bottom: 20px;
+      }
+
+      .step-checkbox-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      @media (max-width: 768px) {
+        .step-checkbox-container {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+      }
+
+      .step-checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        background-color: #f8fafc;
+        border-radius: var(--radius);
+        border: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+        cursor: pointer;
+      }
+
+      .step-checkbox-item:hover {
+        background-color: #f0f9ff;
+        border-color: var(--primary-color);
+      }
+
+      .step-checkbox-item.checked {
+        background-color: rgba(37, 99, 235, 0.1);
+        border-color: var(--primary-color);
+      }
+
+      .step-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: var(--primary-color);
+      }
+
+      .step-label {
+        flex: 1;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-primary);
+        cursor: pointer;
+      }
+
+      .step-description {
         font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 2px;
       }
 
-      .footer p {
-        word-break: break-word;
+      .auto-checkbox-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px;
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border-radius: var(--radius);
+        border: 2px solid rgba(14, 165, 233, 0.2);
+        margin-bottom: 16px;
+        cursor: pointer;
+        transition: all 0.2s ease;
       }
-    }
-  </style>
-</head>
 
-<body>
-  <div class="container">
-    <!-- Main Card Wrapper -->
-    <div class="main-card">
-      <!-- Header -->
-      <header class="header">
-        <div class="header-content">
-          <div class="logo">
-            <i class="fas fa-passport"></i>
-          </div>
-          <div class="header-text">
-            <h1>Document Scanner API</h1>
-            <p>
-              Professional test interface for document scanning and
-              verification • Supports images and PDF files
-            </p>
-          </div>
-        </div>
-        <div class="api-status">
-          <div class="status-indicator"></div>
-          <span>API Status: <strong>Connected</strong></span>
-        </div>
-      </header>
+      .auto-checkbox-container:hover {
+        border-color: var(--accent-color);
+        background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+      }
 
-      <!-- Main Layout -->
-      <div class="main-layout">
-        <!-- Left Column: Input & Controls -->
+      .auto-checkbox-container.checked {
+        border-color: var(--accent-color);
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        color: white;
+      }
 
-        <div>
-          <div class="card">
-            <div class="card-title">
-              <i class="fas fa-cogs"></i>
-              <span>Scan Configuration</span>
+      .auto-checkbox-container.checked .auto-label,
+      .auto-checkbox-container.checked .auto-description {
+        color: white;
+      }
+
+      .auto-checkbox {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        accent-color: white;
+      }
+
+      .auto-label {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--accent-color);
+        cursor: pointer;
+      }
+
+      .auto-description {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 2px;
+      }
+
+      .step-config-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .btn-small {
+        padding: 8px 12px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s ease;
+      }
+
+      .btn-load {
+        background-color: var(--accent-color);
+        color: white;
+      }
+
+      .btn-load:hover {
+        background-color: #0284c7;
+      }
+
+      .btn-save {
+        background-color: var(--success-color);
+        color: white;
+      }
+
+      .btn-save:hover {
+        background-color: #059669;
+      }
+
+      /* Footer */
+      .footer {
+        text-align: center;
+        margin-top: 40px;
+        padding: 20px;
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      @media (max-width: 768px) {
+        .footer {
+          margin-top: 30px;
+          padding: 16px;
+          font-size: 13px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .footer {
+          margin-top: 20px;
+          padding: 12px;
+          font-size: 12px;
+        }
+
+        .footer p {
+          word-break: break-word;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <!-- Main Card Wrapper -->
+      <div class="main-card">
+        <!-- Header -->
+        <header class="header">
+          <div class="header-content">
+            <div class="logo">
+              <i class="fas fa-passport"></i>
             </div>
+            <div class="header-text">
+              <h1>Document Scanner API</h1>
+              <p>
+                Professional test interface for document scanning and
+                verification • Supports images and PDF files
+              </p>
+            </div>
+          </div>
+          <div class="api-status">
+            <div class="status-indicator"></div>
+            <span>API Status: <strong>Connected</strong></span>
+          </div>
+        </header>
 
-            <!-- Input Method Selection -->
-            <div class="input-group">
-              <div class="input-label">
-                <span>Input Method</span>
+        <!-- Main Layout -->
+        <div class="main-layout">
+          <!-- Left Column: Input & Controls -->
+
+          <div>
+            <div class="card">
+              <div class="card-title">
+                <i class="fas fa-cogs"></i>
+                <span>Scan Configuration</span>
               </div>
-              <div class="input-method-selector">
-                <label>
-                  <input type="radio" name="inputMethod" value="file" checked onchange="toggleInputMethod()"
-                    style="cursor: pointer;" />
-                  <i class="fas fa-upload"></i>
-                  <span>Upload File</span>
-                </label>
-                <label>
-                  <input type="radio" name="inputMethod" value="url" onchange="toggleInputMethod()"
-                    style="cursor: pointer;" />
-                  <i class="fas fa-link"></i>
+
+              <!-- Input Method Selection -->
+              <div class="input-group">
+                <div class="input-label">
+                  <span>Input Method</span>
+                </div>
+                <div class="input-method-selector">
+                  <label>
+                    <input
+                      type="radio"
+                      name="inputMethod"
+                      value="file"
+                      checked
+                      onchange="toggleInputMethod()"
+                      style="cursor: pointer"
+                    />
+                    <i class="fas fa-upload"></i>
+                    <span>Upload File</span>
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="inputMethod"
+                      value="url"
+                      onchange="toggleInputMethod()"
+                      style="cursor: pointer"
+                    />
+                    <i class="fas fa-link"></i>
+                    <span>Image URL</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- URL Input (Hidden by default) -->
+              <div class="input-group" id="urlInputGroup" style="display: none">
+                <div class="input-label">
                   <span>Image URL</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- URL Input (Hidden by default) -->
-            <div class="input-group" id="urlInputGroup" style="display: none;">
-              <div class="input-label">
-                <span>Image URL</span>
-                <span class="optional">Required</span>
-              </div>
-              <input type="text" id="imageUrl" class="input-field" placeholder="https://example.com/passport-image.jpg"
-                value="" />
-              <div style="
+                  <span class="optional">Required</span>
+                </div>
+                <input
+                  type="text"
+                  id="imageUrl"
+                  class="input-field"
+                  placeholder="https://example.com/passport-image.jpg"
+                  value=""
+                />
+                <div
+                  style="
                     font-size: 12px;
                     color: var(--text-secondary);
                     margin-top: 6px;
-                  ">
-                Provide a direct URL to the passport image
+                  "
+                >
+                  Provide a direct URL to the passport image
+                </div>
               </div>
-            </div>
 
-            <!-- File Upload (Default/Visible) -->
-            <div class="input-group" id="fileInputGroup">
-              <div class="input-label">
-                <span>Upload File</span>
-                <span class="optional">Required</span>
-              </div>
-              <div style="position: relative;">
-                <input type="file" id="imageFile" accept="image/*,application/pdf" style="display: none;"
-                  onchange="handleFileSelect(event)" />
-                <button type="button" onclick="document.getElementById('imageFile').click()" style="
+              <!-- File Upload (Default/Visible) -->
+              <div class="input-group" id="fileInputGroup">
+                <div class="input-label">
+                  <span>Upload File</span>
+                  <span class="optional">Required</span>
+                </div>
+                <div style="position: relative">
+                  <input
+                    type="file"
+                    id="imageFile"
+                    accept="image/*,application/pdf"
+                    style="display: none"
+                    onchange="handleFileSelect(event)"
+                  />
+                  <button
+                    type="button"
+                    onclick="document.getElementById('imageFile').click()"
+                    style="
                       width: 100%;
                       padding: 40px 20px;
                       border: 2px dashed var(--border-color);
@@ -1008,323 +1183,766 @@
                       cursor: pointer;
                       transition: all 0.2s;
                       text-align: center;
-                    " onmouseover="this.style.borderColor='var(--primary-color)'; this.style.background='#f0f9ff';"
-                  onmouseout="this.style.borderColor='var(--border-color)'; this.style.background='#f8fafc';">
-                  <i class="fas fa-cloud-upload-alt"
-                    style="font-size: 32px; color: var(--primary-color); margin-bottom: 10px; display: block;"></i>
-                  <div style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;"
-                    id="fileButtonText">
-                    Click to select image or PDF
-                  </div>
-                  <div style="font-size: 12px; color: var(--text-secondary);">
-                    Supports: JPG, PNG, JPEG, PDF
-                  </div>
-                </button>
-              </div>
-              <div id="filePreview" style="
+                    "
+                    onmouseover="this.style.borderColor='var(--primary-color)'; this.style.background='#f0f9ff';"
+                    onmouseout="this.style.borderColor='var(--border-color)'; this.style.background='#f8fafc';"
+                  >
+                    <i
+                      class="fas fa-cloud-upload-alt"
+                      style="
+                        font-size: 32px;
+                        color: var(--primary-color);
+                        margin-bottom: 10px;
+                        display: block;
+                      "
+                    ></i>
+                    <div
+                      style="
+                        font-size: 16px;
+                        font-weight: 600;
+                        color: var(--text-primary);
+                        margin-bottom: 4px;
+                      "
+                      id="fileButtonText"
+                    >
+                      Click to select image or PDF
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary)">
+                      Supports: JPG, PNG, JPEG, PDF
+                    </div>
+                  </button>
+                </div>
+                <div
+                  id="filePreview"
+                  style="
                     display: none;
                     margin-top: 12px;
                     padding: 12px;
                     background: #f0f9ff;
                     border-radius: var(--radius);
                     border: 1px solid rgba(14, 165, 233, 0.2);
-                  ">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <i class="fas fa-file-image" style="color: var(--accent-color); font-size: 24px;"></i>
-                  <div style="flex: 1;">
-                    <div id="fileName" style="font-weight: 600; color: var(--text-primary); font-size: 14px;"></div>
-                    <div id="fileSize" style="font-size: 12px; color: var(--text-secondary);"></div>
-                  </div>
-                  <button onclick="clearFile()" style="
+                  "
+                >
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <i
+                      class="fas fa-file-image"
+                      style="color: var(--accent-color); font-size: 24px"
+                    ></i>
+                    <div style="flex: 1">
+                      <div
+                        id="fileName"
+                        style="
+                          font-weight: 600;
+                          color: var(--text-primary);
+                          font-size: 14px;
+                        "
+                      ></div>
+                      <div
+                        id="fileSize"
+                        style="font-size: 12px; color: var(--text-secondary)"
+                      ></div>
+                    </div>
+                    <button
+                      onclick="clearFile()"
+                      style="
                         padding: 6px 12px;
                         background: white;
                         border: 1px solid var(--border-color);
                         border-radius: 6px;
                         cursor: pointer;
                         font-size: 12px;
-                      ">
-                    <i class="fas fa-times"></i>
-                  </button>
+                      "
+                    >
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="input-group">
-              <div class="input-label">
-                <span>Document Type</span>
+              <div class="input-group">
+                <div class="input-label">
+                  <span>Document Type</span>
+                </div>
+                <select id="documentType" class="select-field">
+                  <option value="passport">Passport</option>
+                </select>
               </div>
-              <select id="documentType" class="select-field">
-                <option value="passport">Passport</option>
-              </select>
-            </div>
 
-            <div class="input-group">
-              <div class="input-label">
-                <span>Processing Mode</span>
-              </div>
-              <select id="processingMode" class="select-field">
-                <option value="auto">Auto</option>
-                <option value="ai">Using AI</option>
-              </select>
-              <div style="
+              <div class="input-group">
+                <div class="input-label">
+                  <span>Processing Mode</span>
+                </div>
+                <select id="processingMode" class="select-field">
+                  <option value="auto">Auto</option>
+                  <option value="ai">Using AI</option>
+                </select>
+                <div
+                  style="
                     font-size: 12px;
                     color: var(--text-secondary);
                     margin-top: 6px;
-                  ">
-                <i class="fas fa-info-circle"></i>
-                <span id="processingModeHint">For uploaded files, "Auto" mode (traditional OCR) is recommended</span>
+                  "
+                >
+                  <i class="fas fa-info-circle"></i>
+                  <span id="processingModeHint"
+                    >For uploaded files, "Auto" mode (traditional OCR) is
+                    recommended</span
+                  >
+                </div>
               </div>
-            </div>
 
-            <div class="button-group">
-              <button class="btn btn-primary" onclick="scanPassport()" id="scanButton">
-                <i class="fas fa-search"></i>
-                <span>Scan Document</span>
-              </button>
-              <button class="btn btn-secondary" onclick="clearResults()">
-                <i class="fas fa-broom"></i>
-                <span>Clear Results</span>
-              </button>
+              <!-- Step Configuration Section -->
+              <div class="input-group step-config-section">
+                <div class="input-label">
+                  <span>Processing Steps</span>
+                  <span class="optional">Configure which steps to run</span>
+                </div>
+
+                <!-- Auto Checkbox -->
+                <div
+                  class="auto-checkbox-container"
+                  id="autoCheckboxContainer"
+                  onclick="toggleAutoMode()"
+                >
+                  <input
+                    type="checkbox"
+                    id="autoCheckbox"
+                    class="auto-checkbox"
+                    onchange="toggleAutoMode()"
+                  />
+                  <div style="flex: 1">
+                    <div class="auto-label">
+                      <i class="fas fa-magic"></i>
+                      Auto Mode
+                    </div>
+                    <div class="auto-description">
+                      Enable all processing steps automatically
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Individual Step Checkboxes -->
+                <div class="step-checkbox-container">
+                  <div
+                    class="step-checkbox-item"
+                    id="step1Container"
+                    onclick="toggleStep('STEP1')"
+                  >
+                    <input
+                      type="checkbox"
+                      id="step1Checkbox"
+                      class="step-checkbox"
+                      checked
+                      onchange="updateStepFromCheckbox('STEP1')"
+                    />
+                    <div style="flex: 1">
+                      <div class="step-label">STEP 1: FastMRZ</div>
+                      <div class="step-description">
+                        FastMRZ Fallback Validation
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    class="step-checkbox-item"
+                    id="step2Container"
+                    onclick="toggleStep('STEP2')"
+                  >
+                    <input
+                      type="checkbox"
+                      id="step2Checkbox"
+                      class="step-checkbox"
+                      checked
+                      onchange="updateStepFromCheckbox('STEP2')"
+                    />
+                    <div style="flex: 1">
+                      <div class="step-label">STEP 2: PassportEye</div>
+                      <div class="step-description">
+                        PassportEye Fallback Validation
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    class="step-checkbox-item"
+                    id="step3Container"
+                    onclick="toggleStep('STEP3')"
+                  >
+                    <input
+                      type="checkbox"
+                      id="step3Checkbox"
+                      class="step-checkbox"
+                      checked
+                      onchange="updateStepFromCheckbox('STEP3')"
+                    />
+                    <div style="flex: 1">
+                      <div class="step-label">STEP 3: EasyOCR</div>
+                      <div class="step-description">
+                        EasyOCR Fallback Validation
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    class="step-checkbox-item"
+                    id="step4Container"
+                    onclick="toggleStep('STEP4')"
+                  >
+                    <input
+                      type="checkbox"
+                      id="step4Checkbox"
+                      class="step-checkbox"
+                      checked
+                      onchange="updateStepFromCheckbox('STEP4')"
+                    />
+                    <div style="flex: 1">
+                      <div class="step-label">STEP 4: Tesseract</div>
+                      <div class="step-description">Tesseract OCR Fallback</div>
+                    </div>
+                  </div>
+
+                  <div
+                    class="step-checkbox-item"
+                    id="step5Container"
+                    onclick="toggleStep('STEP5')"
+                  >
+                    <input
+                      type="checkbox"
+                      id="step5Checkbox"
+                      class="step-checkbox"
+                      onchange="updateStepFromCheckbox('STEP5')"
+                    />
+                    <div style="flex: 1">
+                      <div class="step-label">STEP 5: Validation</div>
+                      <div class="step-description">
+                        Passport Validation Checker
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    class="step-checkbox-item"
+                    id="step6Container"
+                    onclick="toggleStep('STEP6')"
+                  >
+                    <input
+                      type="checkbox"
+                      id="step6Checkbox"
+                      class="step-checkbox"
+                      onchange="updateStepFromCheckbox('STEP6')"
+                    />
+                    <div style="flex: 1">
+                      <div class="step-label">STEP 6: AI Parser</div>
+                      <div class="step-description">
+                        Gemini AI Parser (Final Fallback)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="step-config-actions">
+                  <button class="btn-small btn-load" onclick="loadStepConfig()">
+                    <i class="fas fa-download"></i> Load Config
+                  </button>
+                  <button class="btn-small btn-save" onclick="saveStepConfig()">
+                    <i class="fas fa-save"></i> Save Config
+                  </button>
+                </div>
+              </div>
+
+              <div class="button-group">
+                <button
+                  class="btn btn-primary"
+                  onclick="scanPassport()"
+                  id="scanButton"
+                >
+                  <i class="fas fa-search"></i>
+                  <span>Scan Document</span>
+                </button>
+                <button class="btn btn-secondary" onclick="clearResults()">
+                  <i class="fas fa-broom"></i>
+                  <span>Clear Results</span>
+                </button>
+              </div>
             </div>
           </div>
 
-        </div>
-
-        <!-- Right Column: Results -->
-        <div>
-          <div class="card">
-            <div class="card-title">
-              <i class="fas fa-clipboard-check"></i>
-              <span>Scan Results</span>
-            </div>
-
-            <!-- Loading State -->
-            <div class="loading" id="loading">
-              <div class="spinner"></div>
-              <div style="text-align: center; margin-top: 20px">
-                <h3 style="margin-bottom: 10px; color: var(--text-primary)">
-                  Processing Document
-                </h3>
-                <p style="color: var(--text-secondary)">
-                  Analyzing image and extracting information...
-                </p>
+          <!-- Right Column: Results -->
+          <div>
+            <div class="card">
+              <div class="card-title">
+                <i class="fas fa-clipboard-check"></i>
+                <span>Scan Results</span>
               </div>
-            </div>
 
-            <!-- Results Container -->
-            <div class="result-section" id="results">
-              <!-- Results will be dynamically inserted here -->
+              <!-- Loading State -->
+              <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div style="text-align: center; margin-top: 20px">
+                  <h3 style="margin-bottom: 10px; color: var(--text-primary)">
+                    Processing Document
+                  </h3>
+                  <p style="color: var(--text-secondary)">
+                    Analyzing image and extracting information...
+                  </p>
+                </div>
+              </div>
+
+              <!-- Results Container -->
+              <div class="result-section" id="results">
+                <!-- Results will be dynamically inserted here -->
+              </div>
             </div>
           </div>
         </div>
       </div>
+      <!-- End Main Card -->
+
+      <!-- Footer -->
+      <div class="footer">
+        <p>
+          Document Scanner API v2.1 | Professional Document Verification System
+        </p>
+        <p style="margin-top: 8px">
+          © 2025 SecureScan Technologies. All rights reserved.
+        </p>
+      </div>
     </div>
-    <!-- End Main Card -->
 
-    <!-- Footer -->
-    <div class="footer">
-      <p>
-        Document Scanner API v2.1 | Professional Document Verification System
-      </p>
-      <p style="margin-top: 8px">
-        © 2025 SecureScan Technologies. All rights reserved.
-      </p>
-    </div>
-  </div>
+    <script>
+      // Global variable to store base64 image
+      let selectedImageBase64 = null;
 
-  <script>
-    // Global variable to store base64 image
-    let selectedImageBase64 = null;
+      // Toggle between URL and File input methods
+      function toggleInputMethod() {
+        const inputMethod = document.querySelector(
+          'input[name="inputMethod"]:checked'
+        ).value;
+        const urlInputGroup = document.getElementById("urlInputGroup");
+        const fileInputGroup = document.getElementById("fileInputGroup");
+        const processingModeHint =
+          document.getElementById("processingModeHint");
 
-    // Toggle between URL and File input methods
-    function toggleInputMethod() {
-      const inputMethod = document.querySelector('input[name="inputMethod"]:checked').value;
-      const urlInputGroup = document.getElementById('urlInputGroup');
-      const fileInputGroup = document.getElementById('fileInputGroup');
-      const processingModeHint = document.getElementById('processingModeHint');
-
-      if (inputMethod === 'url') {
-        urlInputGroup.style.display = 'block';
-        fileInputGroup.style.display = 'none';
-        processingModeHint.textContent = 'AI mode works best with URL-based images';
-      } else {
-        urlInputGroup.style.display = 'none';
-        fileInputGroup.style.display = 'block';
-        processingModeHint.textContent = 'For uploaded files, "Auto" mode (traditional OCR) is recommended';
-      }
-
-      // Clear results when switching
-      clearResults();
-    }
-
-    // Handle file selection (supports images and PDFs)
-    function handleFileSelect(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      // Check file type (accept images and PDFs)
-      const isImage = file.type.match('image.*');
-      const isPDF = file.type === 'application/pdf';
-
-      if (!isImage && !isPDF) {
-        alert('Please select an image file (JPG, PNG, JPEG) or PDF document');
-        return;
-      }
-
-      // Check file size (max 15MB for PDFs, 10MB for images)
-      const maxSize = isPDF ? 15 * 1024 * 1024 : 10 * 1024 * 1024;
-      if (file.size > maxSize) {
-        alert(`File size must be less than ${isPDF ? '15MB' : '10MB'}`);
-        return;
-      }
-
-      // Show file preview with appropriate icon
-      document.getElementById('fileName').textContent = file.name;
-      document.getElementById('fileSize').textContent = formatFileSize(file.size) + (isPDF ? ' (PDF)' : '');
-      document.getElementById('filePreview').style.display = 'block';
-      document.getElementById('fileButtonText').textContent = isPDF ? 'Change PDF' : 'Change image';
-
-      // Update file icon
-      const fileIcon = document.querySelector('#filePreview .fa-file-image');
-      if (fileIcon) {
-        fileIcon.className = isPDF ? 'fas fa-file-pdf' : 'fas fa-file-image';
-      }
-
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        // Store the full base64 with data URI prefix for PDF detection
-        selectedImageBase64 = e.target.result.split(',')[1];
-        console.log(`${isPDF ? 'PDF' : 'Image'} converted to base64, length:`, selectedImageBase64.length);
-
-        // Show a note if PDF is selected
-        if (isPDF) {
-          console.log('PDF detected - will be converted to image automatically');
+        if (inputMethod === "url") {
+          urlInputGroup.style.display = "block";
+          fileInputGroup.style.display = "none";
+          processingModeHint.textContent =
+            "AI mode works best with URL-based images";
+        } else {
+          urlInputGroup.style.display = "none";
+          fileInputGroup.style.display = "block";
+          processingModeHint.textContent =
+            'For uploaded files, "Auto" mode (traditional OCR) is recommended';
         }
+
+        // Clear results when switching
+        clearResults();
+      }
+
+      // Handle file selection (supports images and PDFs)
+      function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Check file type (accept images and PDFs)
+        const isImage = file.type.match("image.*");
+        const isPDF = file.type === "application/pdf";
+
+        if (!isImage && !isPDF) {
+          alert("Please select an image file (JPG, PNG, JPEG) or PDF document");
+          return;
+        }
+
+        // Check file size (max 15MB for PDFs, 10MB for images)
+        const maxSize = isPDF ? 15 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+          alert(`File size must be less than ${isPDF ? "15MB" : "10MB"}`);
+          return;
+        }
+
+        // Show file preview with appropriate icon
+        document.getElementById("fileName").textContent = file.name;
+        document.getElementById("fileSize").textContent =
+          formatFileSize(file.size) + (isPDF ? " (PDF)" : "");
+        document.getElementById("filePreview").style.display = "block";
+        document.getElementById("fileButtonText").textContent = isPDF
+          ? "Change PDF"
+          : "Change image";
+
+        // Update file icon
+        const fileIcon = document.querySelector("#filePreview .fa-file-image");
+        if (fileIcon) {
+          fileIcon.className = isPDF ? "fas fa-file-pdf" : "fas fa-file-image";
+        }
+
+        // Convert to base64
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          // Store the full base64 with data URI prefix for PDF detection
+          selectedImageBase64 = e.target.result.split(",")[1];
+          console.log(
+            `${isPDF ? "PDF" : "Image"} converted to base64, length:`,
+            selectedImageBase64.length
+          );
+
+          // Show a note if PDF is selected
+          if (isPDF) {
+            console.log(
+              "PDF detected - will be converted to image automatically"
+            );
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // Clear selected file
+      function clearFile() {
+        document.getElementById("imageFile").value = "";
+        document.getElementById("filePreview").style.display = "none";
+        document.getElementById("fileButtonText").textContent =
+          "Click to select image or PDF";
+        selectedImageBase64 = null;
+
+        // Reset file icon
+        const fileIcon = document.querySelector(
+          "#filePreview .fa-file-image, #filePreview .fa-file-pdf"
+        );
+        if (fileIcon) {
+          fileIcon.className = "fas fa-file-image";
+        }
+      }
+
+      // Format file size
+      function formatFileSize(bytes) {
+        if (bytes === 0) return "0 Bytes";
+        const k = 1024;
+        const sizes = ["Bytes", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return (
+          Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i]
+        );
+      }
+
+      // Step Configuration Management
+      let currentStepConfig = {
+        STEP1: true,
+        STEP2: true,
+        STEP3: true,
+        STEP4: true,
+        STEP5: false,
+        STEP6: false,
       };
-      reader.readAsDataURL(file);
-    }
 
-    // Clear selected file
-    function clearFile() {
-      document.getElementById('imageFile').value = '';
-      document.getElementById('filePreview').style.display = 'none';
-      document.getElementById('fileButtonText').textContent = 'Click to select image or PDF';
-      selectedImageBase64 = null;
-
-      // Reset file icon
-      const fileIcon = document.querySelector('#filePreview .fa-file-image, #filePreview .fa-file-pdf');
-      if (fileIcon) {
-        fileIcon.className = 'fas fa-file-image';
-      }
-    }
-
-    // Format file size
-    function formatFileSize(bytes) {
-      if (bytes === 0) return '0 Bytes';
-      const k = 1024;
-      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-    }
-
-    async function scanPassport() {
-      const inputMethod = document.querySelector('input[name="inputMethod"]:checked').value;
-      const documentType = document.getElementById("documentType").value;
-      const processingMode = document.getElementById("processingMode").value;
-
-      // Validate input based on method
-      let requestBody;
-      if (inputMethod === 'url') {
-        const imageUrl = document.getElementById("imageUrl").value.trim();
-        if (!imageUrl) {
-          alert("Please enter a valid image URL");
-          return;
-        }
-        requestBody = {
-          image_type: "file",
-          documents_image_url: imageUrl,
-          documents_type: documentType,
-        };
-      } else {
-        // File upload mode
-        if (!selectedImageBase64) {
-          alert("Please select an image file");
-          return;
-        }
-        requestBody = {
-          image_type: "base64",
-          image_base64: selectedImageBase64,
-          documents_type: documentType,
-        };
+      // Toggle individual step
+      function toggleStep(stepName) {
+        const checkbox = document.getElementById(
+          `${stepName.toLowerCase()}Checkbox`
+        );
+        checkbox.checked = !checkbox.checked;
+        updateStepFromCheckbox(stepName);
       }
 
-      // Show loading state
-      document.getElementById("loading").classList.add("active");
-      document.getElementById("results").classList.remove("active");
+      // Update step from checkbox change
+      function updateStepFromCheckbox(stepName) {
+        const checkbox = document.getElementById(
+          `${stepName.toLowerCase()}Checkbox`
+        );
+        const container = document.getElementById(
+          `${stepName.toLowerCase()}Container`
+        );
 
-      // Disable scan button during processing
-      const scanButton = document.getElementById("scanButton");
-      scanButton.disabled = true;
-      scanButton.innerHTML =
-        '<i class="fas fa-spinner fa-spin"></i><span>Processing...</span>';
+        currentStepConfig[stepName] = checkbox.checked;
 
-      const startTime = Date.now();
-
-      try {
-        // Build URL based on processing mode
-        // Use current domain for API calls (works for both localhost and production)
-        const baseUrl = window.location.origin;
-
-        // If opened as file://, default to localhost
-        const apiBase = baseUrl.startsWith("file://")
-          ? "http://localhost:8000"
-          : baseUrl;
-
-        let apiUrl = `${apiBase}/scan`;
-        if (processingMode === "ai") {
-          // Using AI: explicitly add ?ai=on
-          apiUrl += "?ai=on";
+        // Update visual state
+        if (checkbox.checked) {
+          container.classList.add("checked");
+        } else {
+          container.classList.remove("checked");
         }
-        // Auto mode: no parameter (uses API default)
 
-        console.log("API URL:", apiUrl);
+        // Update auto checkbox state
+        updateAutoCheckboxState();
+      }
 
-        const response = await fetch(apiUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        });
+      // Toggle auto mode
+      function toggleAutoMode() {
+        const autoCheckbox = document.getElementById("autoCheckbox");
+        const autoContainer = document.getElementById("autoCheckboxContainer");
 
-        const data = await response.json();
-        const endTime = Date.now();
-        const processingTime = (endTime - startTime) / 1000;
+        if (autoCheckbox.checked) {
+          // Enable all steps
+          Object.keys(currentStepConfig).forEach((step) => {
+            currentStepConfig[step] = true;
+            const checkbox = document.getElementById(
+              `${step.toLowerCase()}Checkbox`
+            );
+            const container = document.getElementById(
+              `${step.toLowerCase()}Container`
+            );
+            checkbox.checked = true;
+            container.classList.add("checked");
+          });
+          autoContainer.classList.add("checked");
+        } else {
+          // Keep current state, just update auto visual
+          autoContainer.classList.remove("checked");
+        }
+      }
 
+      // Update auto checkbox state based on individual steps
+      function updateAutoCheckboxState() {
+        const autoCheckbox = document.getElementById("autoCheckbox");
+        const autoContainer = document.getElementById("autoCheckboxContainer");
 
+        const allEnabled = Object.values(currentStepConfig).every(
+          (enabled) => enabled
+        );
 
-        // Hide loading state
-        document.getElementById("loading").classList.remove("active");
+        autoCheckbox.checked = allEnabled;
+        if (allEnabled) {
+          autoContainer.classList.add("checked");
+        } else {
+          autoContainer.classList.remove("checked");
+        }
+      }
 
-        // Display results
-        const displayImageUrl = inputMethod === 'url' ? document.getElementById("imageUrl").value.trim() : 'Uploaded Image';
-        displayResults(data, displayImageUrl, processingTime);
-      } catch (error) {
-        // Hide loading state
-        document.getElementById("loading").classList.remove("active");
+      // Load step configuration from server
+      async function loadStepConfig() {
+        try {
+          const baseUrl = window.location.origin;
+          const apiBase = baseUrl.startsWith("file://")
+            ? "http://localhost:8000"
+            : baseUrl;
 
+          const response = await fetch(`${apiBase}/step-config`);
+          const data = await response.json();
 
+          if (data.success) {
+            currentStepConfig = data.steps;
 
-        console.error("API Error:", error);
+            // Update UI
+            Object.keys(currentStepConfig).forEach((step) => {
+              const checkbox = document.getElementById(
+                `${step.toLowerCase()}Checkbox`
+              );
+              const container = document.getElementById(
+                `${step.toLowerCase()}Container`
+              );
 
-        // Show error
-        const baseUrl = window.location.origin;
-        const apiBase = baseUrl.startsWith("file://")
-          ? "http://localhost:8000"
-          : baseUrl;
+              if (checkbox && container) {
+                checkbox.checked = currentStepConfig[step];
+                if (currentStepConfig[step]) {
+                  container.classList.add("checked");
+                } else {
+                  container.classList.remove("checked");
+                }
+              }
+            });
 
-        document.getElementById("results").innerHTML = `
+            updateAutoCheckboxState();
+
+            // Show success message
+            showNotification(
+              "Step configuration loaded successfully",
+              "success"
+            );
+          } else {
+            showNotification("Failed to load step configuration", "error");
+          }
+        } catch (error) {
+          console.error("Error loading step config:", error);
+          showNotification("Error loading step configuration", "error");
+        }
+      }
+
+      // Save step configuration to server
+      async function saveStepConfig() {
+        try {
+          const baseUrl = window.location.origin;
+          const apiBase = baseUrl.startsWith("file://")
+            ? "http://localhost:8000"
+            : baseUrl;
+
+          const response = await fetch(`${apiBase}/step-config`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              steps: currentStepConfig,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showNotification(
+              "Step configuration saved successfully",
+              "success"
+            );
+          } else {
+            showNotification("Failed to save step configuration", "error");
+          }
+        } catch (error) {
+          console.error("Error saving step config:", error);
+          showNotification("Error saving step configuration", "error");
+        }
+      }
+
+      // Show notification
+      function showNotification(message, type = "info") {
+        // Create notification element
+        const notification = document.createElement("div");
+        notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+        max-width: 300px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      `;
+
+        // Set background color based on type
+        if (type === "success") {
+          notification.style.backgroundColor = "#10b981";
+        } else if (type === "error") {
+          notification.style.backgroundColor = "#ef4444";
+        } else {
+          notification.style.backgroundColor = "#3b82f6";
+        }
+
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        // Remove after 3 seconds
+        setTimeout(() => {
+          notification.style.animation = "slideOut 0.3s ease";
+          setTimeout(() => {
+            document.body.removeChild(notification);
+          }, 300);
+        }, 3000);
+      }
+
+      // Add CSS for notification animations
+      const style = document.createElement("style");
+      style.textContent = `
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+      }
+    `;
+      document.head.appendChild(style);
+
+      async function scanPassport() {
+        const inputMethod = document.querySelector(
+          'input[name="inputMethod"]:checked'
+        ).value;
+        const documentType = document.getElementById("documentType").value;
+        const processingMode = document.getElementById("processingMode").value;
+
+        // Validate input based on method
+        let requestBody;
+        if (inputMethod === "url") {
+          const imageUrl = document.getElementById("imageUrl").value.trim();
+          if (!imageUrl) {
+            alert("Please enter a valid image URL");
+            return;
+          }
+          requestBody = {
+            image_type: "file",
+            documents_image_url: imageUrl,
+            documents_type: documentType,
+            step_config: currentStepConfig,
+          };
+        } else {
+          // File upload mode
+          if (!selectedImageBase64) {
+            alert("Please select an image file");
+            return;
+          }
+          requestBody = {
+            image_type: "base64",
+            image_base64: selectedImageBase64,
+            documents_type: documentType,
+            step_config: currentStepConfig,
+          };
+        }
+
+        // Show loading state
+        document.getElementById("loading").classList.add("active");
+        document.getElementById("results").classList.remove("active");
+
+        // Disable scan button during processing
+        const scanButton = document.getElementById("scanButton");
+        scanButton.disabled = true;
+        scanButton.innerHTML =
+          '<i class="fas fa-spinner fa-spin"></i><span>Processing...</span>';
+
+        const startTime = Date.now();
+
+        try {
+          // Build URL based on processing mode
+          // Use current domain for API calls (works for both localhost and production)
+          const baseUrl = window.location.origin;
+
+          // If opened as file://, default to localhost
+          const apiBase = baseUrl.startsWith("file://")
+            ? "http://localhost:8000"
+            : baseUrl;
+
+          let apiUrl = `${apiBase}/scan`;
+          if (processingMode === "ai") {
+            // Using AI: explicitly add ?ai=on
+            apiUrl += "?ai=on";
+          }
+          // Auto mode: no parameter (uses API default)
+
+          console.log("API URL:", apiUrl);
+
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          const data = await response.json();
+          const endTime = Date.now();
+          const processingTime = (endTime - startTime) / 1000;
+
+          // Hide loading state
+          document.getElementById("loading").classList.remove("active");
+
+          // Display results
+          const displayImageUrl =
+            inputMethod === "url"
+              ? document.getElementById("imageUrl").value.trim()
+              : "Uploaded Image";
+          displayResults(data, displayImageUrl, processingTime);
+        } catch (error) {
+          // Hide loading state
+          document.getElementById("loading").classList.remove("active");
+
+          console.error("API Error:", error);
+
+          // Show error
+          const baseUrl = window.location.origin;
+          const apiBase = baseUrl.startsWith("file://")
+            ? "http://localhost:8000"
+            : baseUrl;
+
+          document.getElementById("results").innerHTML = `
             <div class="error-message">
               <div class="error-title">
                 <i class="fas fa-exclamation-circle"></i>
@@ -1345,30 +1963,31 @@
               </div>
             </div>
           `;
-        document.getElementById("results").classList.add("active");
-      } finally {
-        // Re-enable scan button
-        scanButton.disabled = false;
-        scanButton.innerHTML =
-          '<i class="fas fa-search"></i><span>Scan Document</span>';
+          document.getElementById("results").classList.add("active");
+        } finally {
+          // Re-enable scan button
+          scanButton.disabled = false;
+          scanButton.innerHTML =
+            '<i class="fas fa-search"></i><span>Scan Document</span>';
+        }
       }
-    }
 
-    function displayResults(data, imageUrl, processingTime) {
-      const resultsDiv = document.getElementById("results");
+      function displayResults(data, imageUrl, processingTime) {
+        const resultsDiv = document.getElementById("results");
 
-      if (data.success) {
-        const passportData = data.passport_data || {};
-        const processVia = passportData.processVia || "OCR";
+        if (data.success) {
+          const passportData = data.passport_data || {};
+          const processVia = passportData.processVia || "OCR";
 
-        resultsDiv.innerHTML = `
+          resultsDiv.innerHTML = `
             <div class="result-header">
               <div class="result-badge success">
                 <i class="fas fa-check-circle"></i>
                 <span>Scan Successful</span>
                 <span class="process-method ${processVia.toLowerCase()}">
-                  <i class="fas fa-${processVia.toLowerCase() === "ai" ? "brain" : "eye"
-          }"></i>
+                  <i class="fas fa-${
+                    processVia.toLowerCase() === "ai" ? "brain" : "eye"
+                  }"></i>
                   ${processVia}
                 </span>
               </div>
@@ -1419,8 +2038,8 @@
               </div>
             </div>
           `;
-      } else {
-        resultsDiv.innerHTML = `
+        } else {
+          resultsDiv.innerHTML = `
             <div class="result-header">
               <div class="result-badge error">
                 <i class="fas fa-times-circle"></i>
@@ -1473,76 +2092,79 @@
               </div>
             </div>
           `;
+        }
+
+        resultsDiv.classList.add("active");
       }
 
-      resultsDiv.classList.add("active");
-    }
-
-    function createDataItem(label, value) {
-      return `
+      function createDataItem(label, value) {
+        return `
           <div class="data-item">
             <span class="data-label">${label}</span>
-            <span class="data-value ${!value ? "empty" : ""}">${value || "Not available"
+            <span class="data-value ${!value ? "empty" : ""}">${
+          value || "Not available"
         }</span>
           </div>
         `;
-    }
+      }
 
-    function generateUserFolder(imageUrl) {
-      // Simulate the Python function logic
-      let urlPart = imageUrl.replace(/^https?:\/\//, "");
-      urlPart = urlPart.replace(/^[^/]+\//, "");
-      urlPart = urlPart.replace(/[^\w\-.]/g, "_");
-      urlPart = urlPart.replace(/_+/g, "_");
-      urlPart = urlPart.replace(/^_|_$/g, "");
-      return urlPart || "unknown";
-    }
+      function generateUserFolder(imageUrl) {
+        // Simulate the Python function logic
+        let urlPart = imageUrl.replace(/^https?:\/\//, "");
+        urlPart = urlPart.replace(/^[^/]+\//, "");
+        urlPart = urlPart.replace(/[^\w\-.]/g, "_");
+        urlPart = urlPart.replace(/_+/g, "_");
+        urlPart = urlPart.replace(/^_|_$/g, "");
+        return urlPart || "unknown";
+      }
 
-    function clearResults() {
-      document.getElementById("results").classList.remove("active");
-      document.getElementById("results").innerHTML = "";
-      document.getElementById("imageUrl").focus();
-    }
+      function clearResults() {
+        document.getElementById("results").classList.remove("active");
+        document.getElementById("results").innerHTML = "";
+        document.getElementById("imageUrl").focus();
+      }
 
-    function copyToClipboard(button) {
-      // Find the textarea in the same container
-      const textarea = button.closest("div").previousElementSibling;
+      function copyToClipboard(button) {
+        // Find the textarea in the same container
+        const textarea = button.closest("div").previousElementSibling;
 
-      // Copy to clipboard
-      textarea.select();
-      document.execCommand("copy");
+        // Copy to clipboard
+        textarea.select();
+        document.execCommand("copy");
 
-      // Show feedback
-      const originalText = button.innerHTML;
-      button.innerHTML = '<i class="fas fa-check"></i> Copied!';
-      button.style.background = "#10b981";
+        // Show feedback
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        button.style.background = "#10b981";
 
-      setTimeout(() => {
-        button.innerHTML = originalText;
-        button.style.background = "";
-      }, 2000);
-    }
+        setTimeout(() => {
+          button.innerHTML = originalText;
+          button.style.background = "";
+        }, 2000);
+      }
 
-    // Allow Enter key to submit
-    document
-      .getElementById("imageUrl")
-      .addEventListener("keypress", function (e) {
-        if (e.key === "Enter") {
-          scanPassport();
-        }
+      // Allow Enter key to submit
+      document
+        .getElementById("imageUrl")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter") {
+            scanPassport();
+          }
+        });
+
+      // Initialize with example data
+      document.addEventListener("DOMContentLoaded", function () {
+        // Add some example URLs for quick testing
+        const urlInput = document.getElementById("imageUrl");
+        urlInput.addEventListener("focus", function () {
+          if (this.value === "") {
+            this.value = "";
+          }
+        });
+
+        // Load step configuration on page load
+        loadStepConfig();
       });
-
-    // Initialize with example data
-    document.addEventListener("DOMContentLoaded", function () {
-      // Add some example URLs for quick testing
-      const urlInput = document.getElementById("imageUrl");
-      urlInput.addEventListener("focus", function () {
-        if (this.value === "") {
-          this.value = "";
-        }
-      });
-    });
-  </script>
-</body>
-
+    </script>
+  </body>
 </html>
