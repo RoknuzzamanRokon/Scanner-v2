@@ -125,7 +125,7 @@ def _validate_line2_fields(line2: str) -> Dict[str, str]:
     
     # Sex (Position 20)
     sex = line2[20:21]
-    if sex in ['M', 'F', 'X', '<', '0', '1', '2']:  # Some countries use 0=unspecified, 1=male, 2=female
+    if sex in ['M', 'F', 'X', '0', '1', '2']:  # Some countries use 0=unspecified, 1=male, 2=female
         result["sex"] = "Valid"
     else:
         result["sex"] = "Invalid"
