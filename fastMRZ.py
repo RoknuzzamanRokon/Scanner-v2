@@ -315,8 +315,8 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
                     if len(lines) >= 2:
                         print(f"\n🔍 MRZ LINES SEPARATED:")
                         print(f"┌─────────────────────────────────────────────────┐")
-                        print(f"│ Line 1 (44 chars): {lines[0]} │")
-                        print(f"│ Line 2 (44 chars): {lines[1]} │")
+                        print(f"│ Line 1 (44 chars): {lines[0]}                   │")
+                        print(f"│ Line 2 (44 chars): {lines[1]}                   │")
                         print(f"└─────────────────────────────────────────────────┘")
                         print(f"Line 1 Length: {len(lines[0])}")
                         print(f"Line 2 Length: {len(lines[1])}")
