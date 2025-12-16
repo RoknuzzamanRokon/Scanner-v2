@@ -86,7 +86,7 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         
         if verbose:
             print(f"  ✓ Text extracted: {len(lines)} lines")
-            # print(f"    Text preview: {all_text}...")
+            print(f"    Text preview: {all_text}...")
         
         # Check if this looks like a passport
         is_passport_word = "PASSPORT" in all_text.upper()

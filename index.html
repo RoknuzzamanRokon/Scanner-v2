@@ -190,11 +190,17 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 30px;
+        align-items: start;
       }
 
       @media (max-width: 1024px) {
         .main-layout {
           grid-template-columns: 1fr;
+        }
+
+        /* Remove min-height on mobile for better UX */
+        .main-layout .card {
+          min-height: auto;
         }
       }
 
@@ -206,6 +212,13 @@
         padding: 30px;
         margin-bottom: 24px;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
+        height: fit-content;
+      }
+
+      /* Main content cards - equal height */
+      .main-layout .card {
+        min-height: 600px;
+        height: auto;
       }
 
       .card:hover {
@@ -217,6 +230,10 @@
           padding: 20px;
           margin-bottom: 20px;
         }
+
+        .main-layout .card {
+          min-height: 500px;
+        }
       }
 
       @media (max-width: 480px) {
@@ -224,6 +241,10 @@
           padding: 16px;
           margin-bottom: 16px;
           border-radius: var(--radius);
+        }
+
+        .main-layout .card {
+          min-height: auto;
         }
       }
 
@@ -931,6 +952,23 @@
         border-color: var(--primary-color);
       }
 
+      .step-checkbox-item.disabled {
+        background-color: #f1f5f9;
+        border-color: #cbd5e1;
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .step-checkbox-item.disabled:hover {
+        background-color: #f1f5f9;
+        border-color: #cbd5e1;
+      }
+
+      .step-checkbox-item.disabled .step-label,
+      .step-checkbox-item.disabled .step-description {
+        color: #94a3b8;
+      }
+
       .step-checkbox {
         width: 18px;
         height: 18px;
@@ -1268,28 +1306,10 @@
                 </select>
               </div>
 
-              <div class="input-group">
-                <div class="input-label">
-                  <span>Processing Mode</span>
-                </div>
-                <select id="processingMode" class="select-field">
-                  <option value="auto">Auto</option>
-                  <option value="ai">Using AI</option>
-                </select>
-                <div
-                  style="
-                    font-size: 12px;
-                    color: var(--text-secondary);
-                    margin-top: 6px;
-                  "
-                >
-                  <i class="fas fa-info-circle"></i>
-                  <span id="processingModeHint"
-                    >For uploaded files, "Auto" mode (traditional OCR) is
-                    recommended</span
-                  >
-                </div>
-              </div>
+              <!-- Hidden Processing Mode for JavaScript compatibility -->
+              <select id="processingMode" style="display: none">
+                <option value="auto" selected>Auto</option>
+              </select>
 
               <!-- Step Configuration Section -->
               <div class="input-group step-config-section">
@@ -1521,19 +1541,13 @@
         ).value;
         const urlInputGroup = document.getElementById("urlInputGroup");
         const fileInputGroup = document.getElementById("fileInputGroup");
-        const processingModeHint =
-          document.getElementById("processingModeHint");
 
         if (inputMethod === "url") {
           urlInputGroup.style.display = "block";
           fileInputGroup.style.display = "none";
-          processingModeHint.textContent =
-            "AI mode works best with URL-based images";
         } else {
           urlInputGroup.style.display = "none";
           fileInputGroup.style.display = "block";
-          processingModeHint.textContent =
-            'For uploaded files, "Auto" mode (traditional OCR) is recommended';
         }
 
         // Clear results when switching
@@ -1639,6 +1653,19 @@
         const checkbox = document.getElementById(
           `${stepName.toLowerCase()}Checkbox`
         );
+        const container = document.getElementById(
+          `${stepName.toLowerCase()}Container`
+        );
+
+        // Don't allow toggling if step is disabled in backend
+        if (container.classList.contains("disabled")) {
+          showNotification(
+            `${stepName} is disabled in backend configuration`,
+            "error"
+          );
+          return;
+        }
+
         checkbox.checked = !checkbox.checked;
         updateStepFromCheckbox(stepName);
       }
@@ -1651,6 +1678,12 @@
         const container = document.getElementById(
           `${stepName.toLowerCase()}Container`
         );
+
+        // Don't allow changes if step is disabled in backend
+        if (container.classList.contains("disabled")) {
+          checkbox.checked = false; // Force to unchecked
+          return;
+        }
 
         currentStepConfig[stepName] = checkbox.checked;
 
@@ -1671,17 +1704,21 @@
         const autoContainer = document.getElementById("autoCheckboxContainer");
 
         if (autoCheckbox.checked) {
-          // Enable all steps
+          // Enable only steps that are allowed by backend
           Object.keys(currentStepConfig).forEach((step) => {
-            currentStepConfig[step] = true;
             const checkbox = document.getElementById(
               `${step.toLowerCase()}Checkbox`
             );
             const container = document.getElementById(
               `${step.toLowerCase()}Container`
             );
-            checkbox.checked = true;
-            container.classList.add("checked");
+
+            // Only enable if not disabled in backend
+            if (!container.classList.contains("disabled")) {
+              currentStepConfig[step] = true;
+              checkbox.checked = true;
+              container.classList.add("checked");
+            }
           });
           autoContainer.classList.add("checked");
         } else {
@@ -1731,11 +1768,21 @@
               );
 
               if (checkbox && container) {
-                checkbox.checked = currentStepConfig[step];
-                if (currentStepConfig[step]) {
+                const backendEnabled = currentStepConfig[step];
+
+                // Set checkbox state
+                checkbox.checked = backendEnabled;
+
+                // Update visual state
+                if (backendEnabled) {
                   container.classList.add("checked");
+                  container.classList.remove("disabled");
+                  checkbox.disabled = false;
                 } else {
                   container.classList.remove("checked");
+                  container.classList.add("disabled");
+                  checkbox.disabled = true;
+                  checkbox.checked = false;
                 }
               }
             });
@@ -1844,11 +1891,25 @@
       document.head.appendChild(style);
 
       async function scanPassport() {
-        const inputMethod = document.querySelector(
+        // Check for required elements
+        const inputMethodElement = document.querySelector(
           'input[name="inputMethod"]:checked'
-        ).value;
-        const documentType = document.getElementById("documentType").value;
-        const processingMode = document.getElementById("processingMode").value;
+        );
+        const documentTypeElement = document.getElementById("documentType");
+        const processingModeElement = document.getElementById("processingMode");
+
+        if (
+          !inputMethodElement ||
+          !documentTypeElement ||
+          !processingModeElement
+        ) {
+          showNotification("Error: Required form elements not found", "error");
+          return;
+        }
+
+        const inputMethod = inputMethodElement.value;
+        const documentType = documentTypeElement.value;
+        const processingMode = processingModeElement.value;
 
         // Validate input based on method
         let requestBody;
@@ -1892,20 +1953,15 @@
 
         try {
           // Build URL based on processing mode
-          // Use current domain for API calls (works for both localhost and production)
           const baseUrl = window.location.origin;
-
-          // If opened as file://, default to localhost
           const apiBase = baseUrl.startsWith("file://")
             ? "http://localhost:8000"
             : baseUrl;
 
           let apiUrl = `${apiBase}/scan`;
           if (processingMode === "ai") {
-            // Using AI: explicitly add ?ai=on
             apiUrl += "?ai=on";
           }
-          // Auto mode: no parameter (uses API default)
 
           console.log("API URL:", apiUrl);
 

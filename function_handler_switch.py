@@ -153,6 +153,10 @@ def is_step_enabled(step: str, override_config: Optional[Dict[str, bool]] = None
     """
     Check if a step is enabled (convenience function)
     
+    Backend config is the master control - if a step is OFF in backend, 
+    frontend cannot enable it. Frontend can only disable steps that are 
+    already enabled in backend.
+    
     Args:
         step: Step name (e.g., "STEP1", "STEP2", etc.)
         override_config: Optional dictionary to override step configuration for this check
@@ -160,9 +164,19 @@ def is_step_enabled(step: str, override_config: Optional[Dict[str, bool]] = None
     Returns:
         True if step is enabled, False otherwise
     """
+    backend_enabled = step_controller.is_enabled(step)
+    
+    # If backend has step disabled, it cannot be overridden to enabled
+    if not backend_enabled:
+        return False
+    
+    # If backend has step enabled, check frontend override
     if override_config and step.upper() in override_config:
+        # Frontend can only disable (set to False), not enable
         return override_config[step.upper()]
-    return step_controller.is_enabled(step)
+    
+    # Default to backend configuration
+    return backend_enabled
 
 
 def get_step_status() -> Dict[str, bool]:
