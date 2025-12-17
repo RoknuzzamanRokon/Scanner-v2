@@ -15,12 +15,13 @@ from utils import format_mrz_date
 
 def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool = True) -> Dict:
     """
-    Tesseract OCR Fallback Validation
+    Tesseract OCR Fallback Validation with Enhanced Preprocessing
     
-    - Tesseract OCR text extraction
+    - Advanced image preprocessing for passport documents
+    - MRZ zone detection and isolation
+    - Multiple OCR attempts with different configurations
     - MRZ pattern detection and reconstruction
     - TD3 format validation & cleaning
-    - Meaningful data validation
     
     Args:
         image: PIL Image object
@@ -43,31 +44,93 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         # Convert PIL Image to OpenCV format
         img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
         
-        # Preprocessing for better OCR
-        gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+        if verbose:
+            print(f"  → Applying advanced image preprocessing...")
         
-        # Apply preprocessing for better text recognition
-        # 1. Upscale the image
-        gray = cv2.resize(gray, (gray.shape[1]*2, gray.shape[0]*2))
+        # Try multiple preprocessing approaches
+        processed_images = []
         
-        # 2. Apply Gaussian blur to reduce noise
-        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+        # Approach 1: Enhanced preprocessing for passport documents
+        processed_images.append(preprocess_for_passport_ocr(img_cv, method="enhanced"))
         
-        # 3. Apply adaptive thresholding
-        thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        # Approach 2: MRZ-specific preprocessing
+        processed_images.append(preprocess_for_passport_ocr(img_cv, method="mrz_focused"))
+        
+        # Approach 3: High contrast preprocessing
+        processed_images.append(preprocess_for_passport_ocr(img_cv, method="high_contrast"))
+        
+        # Approach 4: Detect and extract MRZ region specifically
+        mrz_region = detect_mrz_region(img_cv)
+        if mrz_region is not None:
+            processed_images.append(preprocess_for_passport_ocr(mrz_region, method="mrz_only"))
         
         if verbose:
-            print(f"  → Running Tesseract OCR text extraction...")
+            print(f"  → Generated {len(processed_images)} preprocessed variants")
         
-        # Extract text using Tesseract with specific config for passport documents
-        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<'
+        best_result = None
+        best_confidence = 0
         
-        try:
-            # Try with custom config first
-            extracted_text = pytesseract.image_to_string(thresh, config=custom_config)
-        except:
-            # Fallback to default config
-            extracted_text = pytesseract.image_to_string(thresh)
+        # Try OCR with different configurations on each preprocessed image
+        ocr_configs = [
+            # MRZ-specific config with character whitelist
+            r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',
+            # Single text line mode for MRZ
+            r'--oem 3 --psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',
+            # Single word mode
+            r'--oem 3 --psm 8',
+            # Raw line mode
+            r'--oem 3 --psm 13',
+            # Default with character restriction
+            r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<'
+        ]
+        
+        for i, processed_img in enumerate(processed_images):
+            for j, config in enumerate(ocr_configs):
+                try:
+                    if verbose:
+                        print(f"    → Trying OCR variant {i+1}.{j+1}...")
+                    
+                    extracted_text = pytesseract.image_to_string(processed_img, config=config)
+                    
+                    if not extracted_text or len(extracted_text.strip()) < 10:
+                        continue
+                    
+                    # Evaluate the quality of extracted text
+                    text_quality = evaluate_ocr_quality(extracted_text, verbose=False)
+                    
+                    if text_quality > best_confidence:
+                        best_confidence = text_quality
+                        best_result = extracted_text
+                        if verbose:
+                            print(f"      ✓ New best result (quality: {text_quality:.2f})")
+                    
+                    # If we get a very good result, we can stop early
+                    if text_quality > 0.8:
+                        if verbose:
+                            print(f"      ✓ High quality result found, stopping search")
+                        break
+                        
+                except Exception as e:
+                    if verbose:
+                        print(f"      ✗ OCR variant {i+1}.{j+1} failed: {e}")
+                    continue
+            
+            # Break outer loop if high quality found
+            if best_confidence > 0.8:
+                break
+        
+        if not best_result:
+            if verbose:
+                print(f"  ✗ Tesseract: No meaningful text detected in any variant")
+            return {
+                "success": False,
+                "passport_data": {},
+                "mrz_text": "",
+                "method_used": "Tesseract",
+                "error": "No meaningful text detected by Tesseract"
+            }
+        
+        extracted_text = best_result
         
         if not extracted_text or len(extracted_text.strip()) < 10:
             if verbose:
@@ -88,29 +151,59 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
             print(f"  ✓ Text extracted: {len(lines)} lines")
             print(f"    Text preview: {all_text}...")
         
-        # Check if this looks like a passport
-        is_passport_word = "PASSPORT" in all_text.upper()
-        has_mrz_chars = bool(re.search(r"<{3,}", all_text))  # Look for MRZ patterns
+        # Check if this looks like a passport with more flexible criteria
+        passport_indicators = [
+            "PASSPORT" in all_text.upper(),
+            "REPUBLIC" in all_text.upper(),
+            "PEOPLE" in all_text.upper(),
+            "BANGLADESH" in all_text.upper(),
+            "INDIA" in all_text.upper(),
+            "PAKISTAN" in all_text.upper(),
+            "USA" in all_text.upper(),
+            bool(re.search(r"<{2,}", all_text)),  # MRZ padding (2+ < symbols)
+            bool(re.search(r"P<[A-Z]{3}", all_text)),  # MRZ passport type
+            bool(re.search(r"[A-Z0-9]{8,}", all_text)),  # Long alphanumeric sequences
+            bool(re.search(r"\d{6}", all_text)),  # Date patterns
+            len([line for line in lines if len(line.strip()) > 30]) >= 2,  # Long lines (potential MRZ)
+        ]
         
-        if not (is_passport_word or has_mrz_chars):
+        passport_score = sum(passport_indicators)
+        
+        if verbose:
+            print(f"  → Passport indicators found: {passport_score}/12")
+            if passport_score > 0:
+                print(f"    Indicators: {[i for i, x in enumerate(passport_indicators, 1) if x]}")
+        
+        # Lower threshold - if we have any indicators, try to process
+        if passport_score == 0:
             if verbose:
-                print(f"  ✗ Document doesn't appear to be a passport")
+                print(f"  ✗ No passport indicators found in text")
             return {
                 "success": False,
                 "passport_data": {},
                 "mrz_text": "",
                 "method_used": "Tesseract",
-                "error": "Document doesn't appear to be a passport (no passport keywords or MRZ patterns)"
+                "error": "No passport indicators found in extracted text"
             }
         
-        # Try to extract MRZ lines
+        # Try to extract MRZ lines with more flexible criteria
         mrz_lines = []
         potential_mrz = []
         
-        # Look for lines that could be MRZ (contain < symbols and are long)
+        # Look for lines that could be MRZ with multiple criteria
         for line in lines:
             clean_line = line.strip().upper()
-            if '<' in clean_line and len(clean_line) >= 20:
+            
+            # MRZ criteria (any of these makes it a potential MRZ line):
+            mrz_criteria = [
+                '<' in clean_line and len(clean_line) >= 20,  # Traditional MRZ with < symbols
+                len(clean_line) >= 35 and bool(re.search(r'[A-Z0-9]{10,}', clean_line)),  # Long alphanumeric
+                clean_line.startswith('P') and len(clean_line) >= 30,  # Starts with P (passport type)
+                bool(re.search(r'\d{6,}', clean_line)) and len(clean_line) >= 25,  # Contains dates
+                len(clean_line) >= 40,  # Very long lines (likely MRZ)
+            ]
+            
+            if any(mrz_criteria):
                 potential_mrz.append(clean_line)
         
         if verbose:
@@ -190,41 +283,88 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                 line2 = line2[:44].ljust(44, '<')
                 mrz_lines = [line1, line2]
         
-        # If we couldn't get proper MRZ lines, try to extract data from full text
+        # If we couldn't get proper MRZ lines, try alternative extraction methods
         if not mrz_lines:
             if verbose:
-                print(f"  → No valid MRZ lines found, attempting data extraction from full text")
+                print(f"  → No valid MRZ lines found, trying alternative extraction...")
             
-            # Extract passport data from full text
-            passport_data = extract_passport_data_from_text(all_text, verbose)
+            # Method 1: Try to extract MRZ patterns from raw text
+            raw_mrz_candidates = extract_mrz_from_raw_text(all_text, verbose)
             
-            if not passport_data.get("passport_number") and not passport_data.get("surname"):
+            if len(raw_mrz_candidates) >= 2:
                 if verbose:
-                    print(f"  ✗ Could not extract meaningful passport data")
+                    print(f"  → Found {len(raw_mrz_candidates)} MRZ candidates from raw text")
+                
+                # Try to form valid MRZ from candidates
+                line1_candidate = None
+                line2_candidate = None
+                
+                # Look for passport type line (starts with P)
+                for candidate in raw_mrz_candidates:
+                    if candidate.startswith('P') and len(candidate) >= 30:
+                        line1_candidate = candidate
+                        break
+                
+                # Find best second line
+                remaining = [c for c in raw_mrz_candidates if c != line1_candidate]
+                if remaining:
+                    # Score remaining candidates for line 2 characteristics
+                    best_score = -1
+                    for candidate in remaining:
+                        score = 0
+                        if re.search(r'\d{6,}', candidate):  # Contains dates
+                            score += 10
+                        if len(candidate) >= 35:  # Good length
+                            score += 5
+                        if '<' in candidate:  # Has MRZ padding
+                            score += candidate.count('<')
+                        
+                        if score > best_score:
+                            best_score = score
+                            line2_candidate = candidate
+                
+                if line1_candidate and line2_candidate:
+                    # Clean and format the lines
+                    line1 = clean_mrz_line(line1_candidate)
+                    line2 = clean_mrz_line(line2_candidate)
+                    
+                    # Pad to 44 characters if needed
+                    if len(line1) >= 35:
+                        line1 = line1[:44].ljust(44, '<')
+                    if len(line2) >= 35:
+                        line2 = line2[:44].ljust(44, '<')
+                    
+                    if len(line1) == 44 and len(line2) == 44:
+                        mrz_lines = [line1, line2]
+                        if verbose:
+                            print(f"  ✓ Formed MRZ from raw text candidates")
+            
+            # Method 2: Extract passport data from full text and reconstruct MRZ
+            if not mrz_lines:
+                if verbose:
+                    print(f"  → Attempting data extraction from full text...")
+                
+                passport_data = extract_passport_data_from_text(all_text, verbose)
+                
+                if passport_data.get("passport_number") or passport_data.get("surname"):
+                    # Try to reconstruct MRZ from extracted data
+                    reconstructed_mrz = reconstruct_mrz_from_data(passport_data, verbose)
+                    
+                    if reconstructed_mrz:
+                        mrz_lines = reconstructed_mrz.split('\n')
+                        if verbose:
+                            print(f"  ✓ MRZ reconstructed from extracted data")
+            
+            # If still no MRZ, return failure
+            if not mrz_lines:
+                if verbose:
+                    print(f"  ✗ Could not extract or reconstruct valid MRZ")
                 return {
                     "success": False,
-                    "passport_data": {},
+                    "passport_data": passport_data if 'passport_data' in locals() else {},
                     "mrz_text": "",
                     "method_used": "Tesseract",
-                    "error": "Could not extract meaningful passport data from text"
-                }
-            
-            # Try to reconstruct MRZ from extracted data
-            reconstructed_mrz = reconstruct_mrz_from_data(passport_data, verbose)
-            
-            if reconstructed_mrz:
-                mrz_lines = reconstructed_mrz.split('\n')
-                if verbose:
-                    print(f"  ✓ MRZ reconstructed from extracted data")
-            else:
-                if verbose:
-                    print(f"  ⚠ Could not reconstruct valid MRZ")
-                return {
-                    "success": False,
-                    "passport_data": passport_data,
-                    "mrz_text": "",
-                    "method_used": "Tesseract",
-                    "error": "Could not reconstruct valid MRZ from extracted data"
+                    "error": "Could not extract or reconstruct valid MRZ from text"
                 }
         
         # Validate MRZ using TD3 validation checker
@@ -305,6 +445,342 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
             "method_used": "Tesseract",
             "error": f"Tesseract processing error: {str(e)}"
         }
+
+
+def preprocess_for_passport_ocr(img: np.ndarray, method: str = "enhanced") -> np.ndarray:
+    """
+    Advanced preprocessing for passport OCR with multiple methods
+    
+    Args:
+        img: OpenCV image (BGR format)
+        method: Preprocessing method ("enhanced", "mrz_focused", "high_contrast", "mrz_only")
+        
+    Returns:
+        Preprocessed image ready for OCR
+    """
+    # Convert to grayscale
+    if len(img.shape) == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = img.copy()
+    
+    if method == "enhanced":
+        # Enhanced preprocessing for general passport text
+        
+        # 1. Upscale for better character recognition
+        height, width = gray.shape
+        gray = cv2.resize(gray, (width * 3, height * 3), interpolation=cv2.INTER_CUBIC)
+        
+        # 2. Noise reduction
+        gray = cv2.medianBlur(gray, 3)
+        
+        # 3. Enhance contrast using CLAHE
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        gray = clahe.apply(gray)
+        
+        # 4. Morphological operations to clean up text
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        gray = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, kernel)
+        
+        # 5. Adaptive thresholding
+        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 4)
+        
+        return binary
+    
+    elif method == "mrz_focused":
+        # Preprocessing specifically optimized for MRZ text
+        
+        # 1. Aggressive upscaling for small MRZ text
+        height, width = gray.shape
+        gray = cv2.resize(gray, (width * 4, height * 4), interpolation=cv2.INTER_CUBIC)
+        
+        # 2. Gaussian blur to smooth out noise
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+        
+        # 3. Sharpen the image to enhance text edges
+        kernel_sharpen = np.array([[-1,-1,-1],
+                                   [-1, 9,-1],
+                                   [-1,-1,-1]])
+        gray = cv2.filter2D(gray, -1, kernel_sharpen)
+        
+        # 4. Binary threshold with Otsu's method
+        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
+        # 5. Morphological opening to remove noise
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 1))
+        binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+        
+        return binary
+    
+    elif method == "high_contrast":
+        # High contrast preprocessing for difficult images
+        
+        # 1. Moderate upscaling
+        height, width = gray.shape
+        gray = cv2.resize(gray, (width * 2, height * 2), interpolation=cv2.INTER_LANCZOS4)
+        
+        # 2. Histogram equalization for better contrast
+        gray = cv2.equalizeHist(gray)
+        
+        # 3. Apply bilateral filter to reduce noise while keeping edges sharp
+        gray = cv2.bilateralFilter(gray, 9, 75, 75)
+        
+        # 4. Simple binary threshold
+        _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+        
+        # 5. Dilate slightly to make text thicker
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        binary = cv2.dilate(binary, kernel, iterations=1)
+        
+        return binary
+    
+    elif method == "mrz_only":
+        # Preprocessing for isolated MRZ region
+        
+        # 1. Significant upscaling since MRZ is usually small
+        height, width = gray.shape
+        gray = cv2.resize(gray, (width * 5, height * 5), interpolation=cv2.INTER_CUBIC)
+        
+        # 2. Enhance contrast specifically for MRZ
+        gray = cv2.convertScaleAbs(gray, alpha=1.5, beta=10)
+        
+        # 3. Gaussian blur
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+        
+        # 4. Adaptive threshold with larger block size for MRZ
+        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 21, 10)
+        
+        # 5. Clean up with morphological operations
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+        
+        return binary
+    
+    else:
+        # Default: simple preprocessing
+        gray = cv2.resize(gray, (gray.shape[1] * 2, gray.shape[0] * 2))
+        _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+        return binary
+
+
+def detect_mrz_region(img: np.ndarray) -> np.ndarray:
+    """
+    Detect and extract the MRZ region from passport image
+    
+    Args:
+        img: OpenCV image (BGR format)
+        
+    Returns:
+        Cropped MRZ region or None if not found
+    """
+    try:
+        # Convert to grayscale
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        
+        # Apply edge detection to find text regions
+        edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+        
+        # Find contours
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Look for rectangular regions that could be MRZ
+        # MRZ is typically at the bottom of passport and has specific aspect ratio
+        height, width = gray.shape
+        
+        potential_mrz_regions = []
+        
+        for contour in contours:
+            # Get bounding rectangle
+            x, y, w, h = cv2.boundingRect(contour)
+            
+            # MRZ characteristics:
+            # - Usually in bottom 40% of image
+            # - Width should be significant portion of image width
+            # - Height should be relatively small (2 lines of text)
+            # - Aspect ratio should be wide (width >> height)
+            
+            if (y > height * 0.6 and  # In bottom 40%
+                w > width * 0.4 and   # At least 40% of image width
+                h > 20 and h < height * 0.15 and  # Reasonable height for 2 text lines
+                w / h > 5):  # Wide aspect ratio
+                
+                potential_mrz_regions.append((x, y, w, h, w * h))  # Include area for sorting
+        
+        if not potential_mrz_regions:
+            return None
+        
+        # Sort by area (largest first) and take the best candidate
+        potential_mrz_regions.sort(key=lambda x: x[4], reverse=True)
+        
+        # Extract the most likely MRZ region
+        x, y, w, h, _ = potential_mrz_regions[0]
+        
+        # Add some padding around the detected region
+        padding = 10
+        x = max(0, x - padding)
+        y = max(0, y - padding)
+        w = min(width - x, w + 2 * padding)
+        h = min(height - y, h + 2 * padding)
+        
+        mrz_region = gray[y:y+h, x:x+w]
+        
+        return mrz_region
+    
+    except Exception:
+        return None
+
+
+def extract_mrz_from_raw_text(text: str, verbose: bool = False) -> list:
+    """
+    Try to extract MRZ-like patterns from raw OCR text
+    Even when < symbols are not properly detected
+    
+    Args:
+        text: Raw OCR text
+        verbose: Print debug info
+        
+    Returns:
+        List of potential MRZ lines
+    """
+    lines = text.strip().split('\n')
+    potential_mrz = []
+    
+    if verbose:
+        print(f"    → Analyzing {len(lines)} lines for MRZ patterns...")
+    
+    for i, line in enumerate(lines):
+        clean_line = line.strip().upper()
+        
+        if len(clean_line) < 20:
+            continue
+        
+        # Score each line based on MRZ characteristics
+        score = 0
+        reasons = []
+        
+        # Length scoring (MRZ lines are typically 44 characters)
+        if 40 <= len(clean_line) <= 50:
+            score += 10
+            reasons.append("good_length")
+        elif 30 <= len(clean_line) <= 60:
+            score += 5
+            reasons.append("ok_length")
+        
+        # Character pattern scoring
+        if re.search(r'P[A-Z]{3}', clean_line):  # P + country code
+            score += 15
+            reasons.append("passport_type")
+        
+        if re.search(r'[A-Z0-9]{8,}', clean_line):  # Long alphanumeric sequences
+            score += 8
+            reasons.append("long_alphanum")
+        
+        if re.search(r'\d{6}', clean_line):  # Date patterns
+            score += 10
+            reasons.append("date_pattern")
+        
+        if '<' in clean_line:
+            score += clean_line.count('<') * 2  # More < = more likely MRZ
+            reasons.append("mrz_padding")
+        
+        # Position scoring (MRZ usually at bottom)
+        if i > len(lines) * 0.7:  # In bottom 30% of text
+            score += 5
+            reasons.append("bottom_position")
+        
+        # Penalize lines with common words (not MRZ)
+        common_words = ['REPUBLIC', 'PEOPLE', 'PASSPORT', 'GOVERNMENT', 'MINISTRY']
+        word_penalty = sum(2 for word in common_words if word in clean_line)
+        score -= word_penalty
+        if word_penalty > 0:
+            reasons.append(f"word_penalty_{word_penalty}")
+        
+        if verbose and score > 5:
+            print(f"      Line {i+1}: '{clean_line[:50]}...' score={score} ({', '.join(reasons)})")
+        
+        if score >= 10:  # Threshold for potential MRZ
+            potential_mrz.append((score, clean_line, i))
+    
+    # Sort by score and return top candidates
+    potential_mrz.sort(key=lambda x: x[0], reverse=True)
+    
+    if verbose:
+        print(f"    → Found {len(potential_mrz)} potential MRZ lines")
+    
+    return [line for score, line, idx in potential_mrz[:5]]  # Return top 5
+
+
+def evaluate_ocr_quality(text: str, verbose: bool = False) -> float:
+    """
+    Evaluate the quality of OCR extracted text for passport documents
+    
+    Args:
+        text: Extracted text from OCR
+        verbose: Print evaluation details
+        
+    Returns:
+        Quality score between 0.0 and 1.0
+    """
+    if not text or len(text.strip()) < 10:
+        return 0.0
+    
+    score = 0.0
+    factors = []
+    
+    # Factor 1: Presence of passport-related keywords
+    passport_keywords = ['PASSPORT', 'REPUBLIC', 'PEOPLE', 'BANGLADESH', 'INDIA', 'USA', 'PAKISTAN']
+    keyword_count = sum(1 for keyword in passport_keywords if keyword in text.upper())
+    keyword_score = min(keyword_count * 0.2, 0.4)
+    score += keyword_score
+    factors.append(f"Keywords: {keyword_score:.2f}")
+    
+    # Factor 2: Presence of MRZ-like patterns
+    mrz_patterns = [
+        r'P<[A-Z]{3}',  # Passport type and country
+        r'<{2,}',       # MRZ padding
+        r'[A-Z0-9]{6,}', # Long alphanumeric sequences
+        r'\d{6}',       # Date patterns
+    ]
+    
+    mrz_score = 0
+    for pattern in mrz_patterns:
+        if re.search(pattern, text):
+            mrz_score += 0.1
+    
+    mrz_score = min(mrz_score, 0.3)
+    score += mrz_score
+    factors.append(f"MRZ patterns: {mrz_score:.2f}")
+    
+    # Factor 3: Text readability (ratio of readable characters)
+    total_chars = len(text)
+    readable_chars = len(re.findall(r'[A-Za-z0-9<>\s]', text))
+    readability = readable_chars / total_chars if total_chars > 0 else 0
+    readability_score = readability * 0.2
+    score += readability_score
+    factors.append(f"Readability: {readability_score:.2f}")
+    
+    # Factor 4: Penalize excessive garbage characters
+    garbage_chars = len(re.findall(r'[^\w\s<>]', text))
+    garbage_penalty = min(garbage_chars / total_chars * 0.3, 0.3) if total_chars > 0 else 0
+    score -= garbage_penalty
+    factors.append(f"Garbage penalty: -{garbage_penalty:.2f}")
+    
+    # Factor 5: Bonus for structured text (multiple lines, proper spacing)
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    if len(lines) >= 2:
+        structure_bonus = 0.1
+        score += structure_bonus
+        factors.append(f"Structure bonus: {structure_bonus:.2f}")
+    
+    # Normalize score to 0-1 range
+    final_score = max(0.0, min(1.0, score))
+    
+    if verbose:
+        print(f"    OCR Quality Evaluation: {final_score:.2f}")
+        for factor in factors:
+            print(f"      {factor}")
+    
+    return final_score
 
 
 def clean_mrz_line(line: str) -> str:

@@ -33,6 +33,73 @@ def format_mrz_lines(mrz_text: str, verbose: bool = False) -> str:
         print(f"  → Original MRZ: {clean_mrz}")
         print(f"  → Length: {len(clean_mrz)}")
     
+    # Fix name separators in MRZ line 1
+    # Proper format: P<COUNTRY_CODE + SURNAME + << + GIVEN_NAME1 + < + GIVEN_NAME2 + <<<...
+    def fix_name_separator(mrz_line):
+        """Fix name separators in MRZ line 1 to follow proper TD3 format"""
+        if not mrz_line.startswith('P<'):
+            return mrz_line
+            
+        # Only process if this looks like line 1 (contains letters after P<)
+        if len(mrz_line) < 44:
+            return mrz_line
+            
+        # Extract the first 44 characters (line 1)
+        line1 = mrz_line[:44]
+        rest = mrz_line[44:] if len(mrz_line) > 44 else ""
+        
+        # Find country code (3 chars after P<)
+        country_code = line1[2:5]
+        name_section = line1[5:]
+        
+        import re
+        
+        # Extract all name components (letters only, ignoring < separators)
+        name_parts = re.findall(r'[A-Z]+', name_section)
+        
+        if len(name_parts) >= 1:
+            # We have at least a surname
+            surname = name_parts[0]
+            given_names = name_parts[1:] if len(name_parts) > 1 else []
+            
+            # Build the correct name section format:
+            # SURNAME << GIVEN_NAME1 < GIVEN_NAME2 < ... <<<<<<<<<
+            if given_names:
+                # Format: SURNAME << GIVEN_NAME1 < GIVEN_NAME2 < ...
+                formatted_names = surname + '<<' + '<'.join(given_names)
+            else:
+                # Only surname: SURNAME <<
+                formatted_names = surname + '<<'
+            
+            # Calculate remaining space for padding
+            remaining_space = 39 - len(formatted_names)  # 44 - 5 (P< + country) = 39
+            
+            if remaining_space > 0:
+                # Add padding with <
+                formatted_names += '<' * remaining_space
+            elif remaining_space < 0:
+                # Names too long, truncate from the end
+                formatted_names = formatted_names[:39]
+            
+            # Reconstruct line 1
+            fixed_line1 = f"P<{country_code}{formatted_names}"
+            
+            # Reconstruct the full MRZ
+            fixed_mrz = fixed_line1 + rest
+            
+            if verbose and fixed_line1 != line1:
+                print(f"  → Fixed name separators:")
+                print(f"    Before: {line1}")
+                print(f"    After:  {fixed_line1}")
+                print(f"    Names:  {surname} + {given_names}")
+            
+            return fixed_mrz
+        
+        return mrz_line
+    
+    # Apply the fix
+    clean_mrz = fix_name_separator(clean_mrz)
+    
     # Find P< pattern (start of line 1)
     p_pos = clean_mrz.find('P<')
     
@@ -133,6 +200,7 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
             if raw_mrz:
                 # Quick format for immediate display
                 formatted = format_mrz_lines(raw_mrz, verbose=False)
+                print("--------------89898989454fdafadfaadfddfa------------", formatted)
                 if formatted and '\n' in formatted:
                     lines = formatted.split('\n')
                     if len(lines) >= 2:
@@ -143,6 +211,8 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
                         
                         # Store formatted MRZ text for later use
                         formatted_mrz_text = f"{lines[0]}\n{lines[1]}"
+                        
+                        # print("++++++++++++++++++++++",formatted_mrz_text)
                         
                         # Decode MRZ using FastMRZ _parse_mrz method
                         print(f"\n🔍 DECODING MRZ WITH FASTMRZ:")
@@ -207,8 +277,50 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
                 # Extract fields directly from decoded_details
                 document_type = decoded_details.get('document_code', 'P')
                 country_code = decoded_details.get('issuer_code', '').upper()
-                surname = decoded_details.get('surname', '').replace('<', ' ').strip().upper()
-                given_names = decoded_details.get('given_name', '').replace('<', ' ').strip().upper()
+                
+                # Manual name parsing from MRZ to ensure correct extraction
+                def parse_names_from_mrz(mrz_text):
+                    """Parse surname and given names correctly from MRZ line 1"""
+                    try:
+                        lines = mrz_text.strip().split('\n')
+                        if len(lines) < 1:
+                            return "", ""
+                        
+                        line1 = lines[0]
+                        if len(line1) < 5:
+                            return "", ""
+                        
+                        # Extract name section (after P< + 3-char country code)
+                        name_section = line1[5:]
+                        
+                        # Split by << to separate surname from given names
+                        if '<<' in name_section:
+                            parts = name_section.split('<<', 1)
+                            surname_raw = parts[0]
+                            given_names_raw = parts[1] if len(parts) > 1 else ""
+                            
+                            # Clean surname
+                            surname = surname_raw.replace('<', ' ').strip()
+                            
+                            # Clean given names - replace < with space, remove trailing <
+                            given_names = given_names_raw.rstrip('<').replace('<', ' ').strip()
+                            
+                            return surname, given_names
+                        else:
+                            # No << separator found, treat all as surname
+                            surname = name_section.replace('<', ' ').strip()
+                            return surname, ""
+                    except Exception:
+                        return "", ""
+                
+                # Use manual parsing for names
+                surname, given_names = parse_names_from_mrz(formatted_mrz_text)
+                
+                # Fallback to library extraction if manual parsing fails
+                if not surname:
+                    surname = decoded_details.get('surname', '').replace('<', ' ').strip().upper()
+                if not given_names:
+                    given_names = decoded_details.get('given_name', '').replace('<', ' ').strip().upper()
                 passport_number = decoded_details.get('document_number', '')
                 nationality_code = decoded_details.get('nationality_code', '').upper()
                 date_of_birth = decoded_details.get('birth_date', '')  # Already in YYYY-MM-DD format
@@ -236,8 +348,50 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
                 # Fallback to original details
                 document_type = details.get('document_code', 'P')
                 country_code = details.get('issuer_code', '').upper()
-                surname = details.get('surname', '').replace('<', ' ').strip().upper()
-                given_names = details.get('given_name', '').replace('<', ' ').strip().upper()
+                
+                # Use manual name parsing for fallback too
+                def parse_names_from_mrz_fallback(mrz_text):
+                    """Parse surname and given names correctly from MRZ line 1 (fallback)"""
+                    try:
+                        lines = mrz_text.strip().split('\n')
+                        if len(lines) < 1:
+                            return "", ""
+                        
+                        line1 = lines[0]
+                        if len(line1) < 5:
+                            return "", ""
+                        
+                        # Extract name section (after P< + 3-char country code)
+                        name_section = line1[5:]
+                        
+                        # Split by << to separate surname from given names
+                        if '<<' in name_section:
+                            parts = name_section.split('<<', 1)
+                            surname_raw = parts[0]
+                            given_names_raw = parts[1] if len(parts) > 1 else ""
+                            
+                            # Clean surname
+                            surname = surname_raw.replace('<', ' ').strip()
+                            
+                            # Clean given names - replace < with space, remove trailing <
+                            given_names = given_names_raw.rstrip('<').replace('<', ' ').strip()
+                            
+                            return surname, given_names
+                        else:
+                            # No << separator found, treat all as surname
+                            surname = name_section.replace('<', ' ').strip()
+                            return surname, ""
+                    except Exception:
+                        return "", ""
+                
+                # Use manual parsing for names
+                surname, given_names = parse_names_from_mrz_fallback(formatted_mrz_text)
+                
+                # Fallback to library extraction if manual parsing fails
+                if not surname:
+                    surname = details.get('surname', '').replace('<', ' ').strip().upper()
+                if not given_names:
+                    given_names = details.get('given_name', '').replace('<', ' ').strip().upper()
                 passport_number = details.get('document_number', '')
                 nationality_code = details.get('nationality_code', '').upper()
                 date_of_birth = details.get('birth_date', '')
@@ -300,11 +454,11 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
             }
             
             # Construct MRZ text
-            mrz_text = details.get('raw_text', '')
+            mrz_text = formatted_mrz_text
             
             # Debug: Print and separate MRZ text into lines
-            print(f"Print mrz text for debug==========================: {mrz_text}")
-            print(f"====================================================================================================")
+            print(f"Print mrz text for debug==========================: {formatted_mrz_text}")
+            print(f"===============================================88=====================================================")
             
             if mrz_text:
                 # Format MRZ into proper two-line format
@@ -392,8 +546,9 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
 
             
             print(f"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            
-            mrz_for_validation =  f"{mrz_text}"  
+            print("MRZ validation checking result here.")
+            mrz_for_validation =  f"{mrz_text}" 
+            # print(mrz_for_validation) 
             
             # Import and use the passport field validation function
             from passport_check import validate_passport_fields
@@ -407,7 +562,24 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
             # Summary
             valid_count = sum(1 for status in field_results.values() if status == "Valid")
             total_count = len(field_results)
-            print(f"\nField Validation Summary: {valid_count}/{total_count} fields are valid\n\n")
+            print(f"\nField Validation Summary: {valid_count}/{total_count} fields are valid\n")
+            
+            # Final passport full data
+            print("Final passport full data:")
+            print("=" * 50)
+            print(f"Document Type      : {passport_data.get('document_type', 'N/A')}")
+            print(f"Country Code       : {passport_data.get('country_code', 'N/A')}")
+            print(f"Country Name       : {passport_data.get('country_name', 'N/A')}")
+            print(f"Surname            : {passport_data.get('surname', 'N/A')}")
+            print(f"Given Names        : {passport_data.get('given_names', 'N/A')}")
+            print(f"Passport Number    : {passport_data.get('passport_number', 'N/A')}")
+            print(f"Nationality        : {passport_data.get('nationality', 'N/A')}")
+            print(f"Date of Birth      : {passport_data.get('date_of_birth', 'N/A')}")
+            print(f"Sex                : {passport_data.get('sex', 'N/A')}")
+            print(f"Expiry Date        : {passport_data.get('expiry_date', 'N/A')}")
+            print(f"Personal Number    : {passport_data.get('personal_number', 'N/A')}")
+            print("=" * 50)
+            print()
         
             
             

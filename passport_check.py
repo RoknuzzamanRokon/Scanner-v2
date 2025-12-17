@@ -350,8 +350,8 @@ if __name__ == "__main__":
     # Test with Syrian passport MRZ
     print("\n1. Testing Syrian Passport MRZ:")
     print("-" * 30)
-    sample_mrz1 = """PNSYRJARBOUAA<<ABDALLAH<<<<<<<<<<<<<<<<<4<<<
-N027191148SYR01062890310819203140039989<<<88"""
+    sample_mrz1 = """P<UTOQUEST<<AMELIA<MARY<<<<<<<<<<<<<<<<<<<<<
+S012345674UTO8704234F3208265<<<<<<<<<<<<<<<2"""
     
     result1 = validate_passport_fields(sample_mrz1)
     
@@ -362,8 +362,8 @@ N027191148SYR01062890310819203140039989<<<88"""
     # Test with Bangladesh passport MRZ
     print("\n2. Testing Bangladesh Passport MRZ:")
     print("-" * 30)
-    sample_mrz2 = """P<BGDNAYEEM<<NAZMUS<SAAQEB<<<<<<<<<<<<<<<<<<
-A033372440BGD8510242M32030642696829658575<80"""
+    sample_mrz2 = """P<UTOQUEST<<AMELIA<MARY<<<<<<<<<<<<<<<<<<<<<
+S012345674UTO8704234F3208265<<<<<<<<<<<<<<<2"""
     
     result2 = validate_passport_fields(sample_mrz2)
     
