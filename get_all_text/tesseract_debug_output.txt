@@ -1,0 +1,200 @@
+=== Tesseract OCR Debug Results ===
+
+Total extraction attempts: 9
+Best confidence score: 0.66
+
+--- Attempt 1: variant_1.2 ---
+Config: 
+Text length: 209 characters
+Text:
+ease
+teat
+
+ae tet .
+
+aaa totes
+
+> _ ty Sates, * rot
+
+‘ Bee Foy gee
+Bg ay Fe “fen
+
+* canting
+
+a a anise |
+: ‘PAKISTAN |
+gdh
+
+2 103021 09482 |
+
+*
+aay
+
+a ee
+
+TOF aca”
+
+ey
+
+“me ie i
+wate bw
+
+rv
+
+elles...
+
+hn
+
+4
+
+i
+
+
+
+--- Attempt 2: variant_1.4 ---
+Config: --oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<
+Text length: 0 characters
+Text:
+
+
+--- Attempt 3: variant_1.5 ---
+Config: --oem 3 --psm 8
+Text length: 2 characters
+Text:
+‘i
+
+
+--- Attempt 4: variant_2.1 ---
+Config: --psm 6
+Text length: 104 characters
+Text:
+Wa T ARK) a a se =
+« fges ae =e ___ PAKISTANI. ae
+a i Wi955 42101-0635223-S
+: “ DAWICTA
+Pi > ‘ whe
+% a *
+
+
+--- Attempt 5: variant_3.1 ---
+Config: --psm 6
+Text length: 1100 characters
+Text:
+ee oe a
+Pete ete te 08 6 O04 OO 6 SHERe CO Oe ‘
+_ oy ecto 00 oe > - Sane eee .
+: ag AE. + ee + ee “"" @& 69 ee me .
+: ood ‘ sHr,r me ge.) > sper @ “* «& im 1 dé ’ an .
+oe Baers ape Gate BRE, «oS Seeea? NV See j2572
+a ~~ Z| ¥ homes a a eee koe *
+ee re Boy. aaa =< - ts ae
+ee _** a: ee orn . ; " .S * a . ee ; * Ft tha 7
+Ce eee Te rd
+oy eS pee ee * wha}
+oo fee et = on ee ii dee gen Nase ate
+~ $63.) 8la # ee, 8 oe
+. = * . _ : * . . deees
+‘ 8g a oe ts, ig . -,-
+- mo . * "Si, ee . + at
+og F ' ge , a i idl ete Oe
+“lh &
+* - | Pa a . ~ . -
+, at Migs, ¢ mete : r =e Fs i
+l= aiF “fe ee late fy t tilt ' 4 @i
+* eat an &€ . 5 ? Ps e Fa ‘
+oe ae A: eR FE RO ey ou ee oy
+ce ae ~~ - a a my -)- op) é HB 4 a a Mm at: ;=
+ind . Ot sag MRR CH |
+i Be y : a 2 *,‘" a? 27. to. eb \ my as =. ae
+ae ie DS od 2042 it SAPS iL
+nd ( ee a os Bare \. . P i é ? 4 ‘ os = 8 * 2 med
+= ee ad ad a ian S * < ‘v, 7 aaa *
+- Cc." wie 6) ety a; ba
+Saeee Bee a a Meg a.
+aL ee! : *
+ei ECE KK KK |
+_ bg ee A " soy re es
+cil on gs i le =< sos 2. ood. ;
+— Po 3 Fee yin.
+. E24" . teh a ai . ,
+a ate 4 * vw. a aie Ree We :
+* ~~ a" fe ”@ og See
+
+
+--- Attempt 6: variant_3.2 ---
+Config: 
+Text length: 90 characters
+Text:
+ee
+ads #2 £4 oe
+Pere eee Oe ee
+
+en oe or
+
+we
+
+we wl 234?
+
+# >
+
+Tease ate
+
+42101-0635 235-5
+
+
+--- Attempt 7: variant_3.3 ---
+Config: --oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<
+Text length: 269 characters
+Text:
+PS OS
+P6086O0F4OOOSHEROCOO
+U<00SN
+AE 69 I
+2 H G A 1
+BGBRESSNS 2572
+Z
+BN <
+S F 7
+CT
+SS
+S S N
+0638O
+BO
+SS
+F OD
+PP
+M FS
+F B L 4
+5 4 F
+3 A FRO
+HB 4 M
+OS MORGC
+MB 2 27 E <
+DS2O4SISAPSL
+O B P 4 7 2
+S S < 7
+C2 6
+SA MS
+LB
+MEECEK<KKK
+BO A 4 7
+<< S 2
+< PY 33 Y
+E24 44 2
+4 RW
+2 SP
+
+
+--- Attempt 8: variant_3.4 ---
+Config: --oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<
+Text length: 0 characters
+Text:
+
+
+--- Attempt 9: variant_3.5 ---
+Config: --oem 3 --psm 8
+Text length: 1 characters
+Text:
+“
+
+

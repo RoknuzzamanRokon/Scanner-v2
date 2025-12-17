@@ -5,7 +5,9 @@ Simple implementation following the fastMRZ pattern
 import cv2
 import time
 import warnings
+from PIL import Image
 from passporteye import read_mrz
+from sex_field_normalizer import normalize_sex_field
 
 # Suppress FutureWarnings from PassportEye library
 warnings.filterwarnings("ignore", category=FutureWarning, module="passporteye")
@@ -671,7 +673,7 @@ if __name__ == "__main__":
         print("\nProcessing failed - no MRZ detected.")
 
 
-def validate_passport_with_PassportEye_fallback(image, verbose=True):
+def validate_passport_with_PassportEye_fallback(image, verbose=True, user_id=None):
     """
     Validate passport using PassportEye with fallback functionality
     Compatible with the scanner.py interface
@@ -687,12 +689,39 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True):
         if verbose:
             print(f"  → Processing with PassportEye...")
         
+        # Check for previous validation failures
+        if user_id:
+            from utils import load_validation_failures, analyze_previous_failures
+            previous_failures = load_validation_failures(user_id)
+            if previous_failures:
+                analysis = analyze_previous_failures(previous_failures, "PassportEye")
+                if analysis["suggestions"]:
+                    print(f"💡 Suggestions based on previous failures:")
+                    for suggestion in analysis["suggestions"]:
+                        print(f"   → {suggestion}")
+        
         # Convert PIL Image to temporary file for processing
         import tempfile
         import os
         
         # Save PIL image to temporary file
         with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
+            # Convert RGBA to RGB if necessary (JPEG doesn't support transparency)
+            if image.mode in ('RGBA', 'LA', 'P'):
+                # Create white background
+                rgb_image = Image.new('RGB', image.size, (255, 255, 255))
+                if image.mode == 'P':
+                    image = image.convert('RGBA')
+                # Paste image onto white background, using alpha channel as mask if available
+                if image.mode in ('RGBA', 'LA'):
+                    rgb_image.paste(image, mask=image.split()[-1])  # Use alpha channel as mask
+                else:
+                    rgb_image.paste(image)
+                image = rgb_image
+            elif image.mode != 'RGB':
+                # Convert other modes to RGB
+                image = image.convert('RGB')
+            
             image.save(tmp_file.name, 'JPEG')
             temp_image_path = tmp_file.name
         
@@ -703,6 +732,9 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True):
             if result:
                 if verbose:
                     print(f"  ✓ PassportEye processing successful")
+                
+                # Initialize validation_check variable
+                validation_check = None
                 
                 # Check if we have TD3 compliant decoded details (stored globally during processing)
                 if hasattr(process_passport_image, 'td3_decoded_details') and process_passport_image.td3_decoded_details:
@@ -724,7 +756,7 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True):
                         "country_iso": country_info.get('alpha2', ''),
                         "nationality": country_info.get('nationality', country_code_clean),
                         "date_of_birth": td3_data.get('birth_date', ''),
-                        "sex": td3_data.get('sex', ''),
+                        "sex": normalize_sex_field(td3_data.get('sex', '')),
                         "expiry_date": td3_data.get('expiry_date', ''),
                         "personal_number": td3_data.get('personal_number', '').replace('<', '').strip()
                     }
@@ -736,6 +768,33 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True):
                         print(f"    Given Names: {passport_data['given_names']} (cleaned)")
                         print(f"    Birth Date: {passport_data['date_of_birth']} (formatted)")
                         print(f"    Expiry Date: {passport_data['expiry_date']} (formatted)")
+                    
+                    # Check field validation threshold
+                    from utils import check_field_validation_threshold
+                    validation_check = check_field_validation_threshold(mrz_text, threshold=10, verbose=verbose)
+                    
+                    if not validation_check["threshold_met"]:
+                        if verbose:
+                            print(f"⚠️  Field validation threshold not met: {validation_check['valid_count']}/10 fields valid")
+                            print(f"   → Proceeding to next validation method...")
+                        
+                        # Save validation failure to temp file for user (TD3 data path)
+                        if user_id:
+                            from utils import save_validation_failure
+                            save_validation_failure(user_id, "PassportEye", passport_data, validation_check["field_results"], mrz_text)
+                        
+                        return {
+                            "success": False,
+                            "passport_data": passport_data,
+                            "mrz_text": mrz_text,
+                            "method_used": "PassportEye",
+                            "error": f"Field validation threshold not met: {validation_check['valid_count']}/10 fields valid",
+                            "validation_summary": validation_check
+                        }
+                    
+                    if verbose:
+                        print(f"✅ Field validation threshold met: {validation_check['valid_count']}/10 fields valid")
+                        print(f"   → Returning validated passport data...")
                 else:
                     # Fallback to original PassportEye data
                     from country_code import get_country_info
@@ -752,7 +811,7 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True):
                         "country_iso": country_info.get('alpha2', ''),
                         "nationality": country_info.get('nationality', country_code_clean),
                         "date_of_birth": result.get('date_of_birth', ''),
-                        "sex": result.get('sex', ''),
+                        "sex": normalize_sex_field(result.get('sex', '')),
                         "expiry_date": result.get('expiration_date', ''),
                         "personal_number": result.get('personal_number', '').replace('<', '').strip()
                     }
@@ -761,6 +820,44 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True):
                     
                     if verbose:
                         print(f"  ⚠️ Using original PassportEye data (TD3 data not available)")
+                    
+                    # Check field validation threshold for fallback data
+                    from utils import check_field_validation_threshold
+                    validation_check = check_field_validation_threshold(mrz_text, threshold=10, verbose=verbose)
+                    
+                    if not validation_check["threshold_met"]:
+                        if verbose:
+                            print(f"⚠️  Field validation threshold not met: {validation_check['valid_count']}/10 fields valid")
+                            print(f"   → Proceeding to next validation method...")
+                        
+                        # Save validation failure to temp file for user (fallback data path)
+                        if user_id:
+                            from utils import save_validation_failure
+                            save_validation_failure(user_id, "PassportEye", passport_data, validation_check["field_results"], mrz_text)
+                        
+                        return {
+                            "success": False,
+                            "passport_data": passport_data,
+                            "mrz_text": mrz_text,
+                            "method_used": "PassportEye",
+                            "error": f"Field validation threshold not met: {validation_check['valid_count']}/10 fields valid",
+                            "validation_summary": validation_check
+                        }
+                    
+                    if verbose:
+                        print(f"✅ Field validation threshold met: {validation_check['valid_count']}/10 fields valid")
+                        print(f"   → Returning validated passport data...")
+                
+                # Ensure validation_check is available for the return statement
+                if validation_check is None:
+                    # This shouldn't happen, but provide a fallback
+                    validation_check = {
+                        "threshold_met": True,
+                        "valid_count": 10,
+                        "total_count": 10,
+                        "field_results": {},
+                        "summary": "10/10 fields are valid"
+                    }
                 
                 return {
                     "success": True,
@@ -768,7 +865,8 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True):
                     "mrz_text": mrz_text,
                     "method_used": "PassportEye",
                     "confidence": result.get('valid_score', 0) / 100.0,
-                    "error": ""
+                    "error": "",
+                    "validation_summary": validation_check
                 }
             else:
                 if verbose:

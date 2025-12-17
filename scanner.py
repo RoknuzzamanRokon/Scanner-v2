@@ -116,12 +116,17 @@ def scan_passport(
             print("-"*60)
             
             step_start = time.time()
-            fastmrz_result = validate_passport_with_fastmrz_fallback(image, verbose=True)
+            fastmrz_result = validate_passport_with_fastmrz_fallback(image, verbose=True, user_id=user_id)
             step_timings["step1_fastmrz"] = f"{time.time() - step_start:.2f}s"
             working_process_step["step1_fastmrz"] = fastmrz_result.get("method_used", "FastMRZ")
             
             if fastmrz_result.get("success", False):
                 print("\n✅ SUCCESS via FastMRZ (Early Exit)")
+                
+                # Remove validation failure file on success
+                if user_id:
+                    from utils import remove_validation_failures
+                    remove_validation_failures(user_id)
                 
                 # Clean up user temp folder on success
                 if user_folder_path:
@@ -161,12 +166,17 @@ def scan_passport(
             print("-"*60)
             
             step_start = time.time()
-            passporteye_result = validate_passport_with_PassportEye_fallback(image, verbose=True)
+            passporteye_result = validate_passport_with_PassportEye_fallback(image, verbose=True, user_id=user_id)
             step_timings["step2_passporteye"] = f"{time.time() - step_start:.2f}s"
             working_process_step["step2_passporteye"] = passporteye_result.get("method_used", "PassportEye")
             
             if passporteye_result.get("success", False):
                 print("\n✅ SUCCESS via PassportEye (Early Exit)")
+                
+                # Remove validation failure file on success
+                if user_id:
+                    from utils import remove_validation_failures
+                    remove_validation_failures(user_id)
                 
                 # Clean up user temp folder on success
                 if user_folder_path:
@@ -209,12 +219,17 @@ def scan_passport(
             
             step_start = time.time()
             from easyOCR import validate_passport_with_easyocr_fallback
-            easyocr_result = validate_passport_with_easyocr_fallback(image, verbose=True, user_folder=user_folder)
+            easyocr_result = validate_passport_with_easyocr_fallback(image, verbose=True, user_folder=user_folder, user_id=user_id)
             step_timings["step3_easyocr"] = f"{time.time() - step_start:.2f}s"
             working_process_step["step3_easyocr"] = easyocr_result.get("method_used", "EasyOCR")
             
             if easyocr_result.get("success", False):
                 print("\n✅ SUCCESS via EasyOCR (Early Exit)")
+                
+                # Remove validation failure file on success
+                if user_id:
+                    from utils import remove_validation_failures
+                    remove_validation_failures(user_id)
                 
                 # Clean up user temp folder on success
                 if user_folder_path:
@@ -256,12 +271,17 @@ def scan_passport(
             step_start = time.time()
             try:
                 from tesseractOCR import validate_passport_with_tesseract_fallback
-                tesseract_result = validate_passport_with_tesseract_fallback(image, verbose=True)
+                tesseract_result = validate_passport_with_tesseract_fallback(image, verbose=True, user_id=user_id)
                 step_timings["step4_tesseract"] = f"{time.time() - step_start:.2f}s"
                 working_process_step["step4_tesseract"] = tesseract_result.get("method_used", "Tesseract")
                 
                 if tesseract_result.get("success", False):
                     print("\n✅ SUCCESS via Tesseract OCR (Early Exit)")
+                    
+                    # Remove validation failure file on success
+                    if user_id:
+                        from utils import remove_validation_failures
+                        remove_validation_failures(user_id)
                     
                     # Clean up user temp folder on success
                     if user_folder_path:

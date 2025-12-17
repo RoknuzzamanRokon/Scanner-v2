@@ -13,7 +13,7 @@ from country_code import get_country_info
 from utils import format_mrz_date
 
 
-def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool = True) -> Dict:
+def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool = True, user_id: str = None) -> Dict:
     """
     Tesseract OCR Fallback Validation with Enhanced Preprocessing
     
@@ -34,6 +34,17 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         if verbose:
             print(f"  → Processing with Tesseract OCR...")
         
+        # Check for previous validation failures
+        if user_id:
+            from utils import load_validation_failures, analyze_previous_failures
+            previous_failures = load_validation_failures(user_id)
+            if previous_failures:
+                analysis = analyze_previous_failures(previous_failures, "Tesseract")
+                if analysis["suggestions"]:
+                    print(f"💡 Suggestions based on previous failures:")
+                    for suggestion in analysis["suggestions"]:
+                        print(f"   → {suggestion}")
+        
         # Set Tesseract path from environment
         from config import config
         if hasattr(config, 'TESSERACT_CMD') and config.TESSERACT_CMD:
@@ -47,41 +58,45 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         if verbose:
             print(f"  → Applying advanced image preprocessing...")
         
-        # Try multiple preprocessing approaches
+        # Try multiple preprocessing approaches (Optimized for speed and effectiveness)
         processed_images = []
         
-        # Approach 1: Enhanced preprocessing for passport documents
+        # Approach 1: PSM 6 works best with enhanced preprocessing
         processed_images.append(preprocess_for_passport_ocr(img_cv, method="enhanced"))
         
-        # Approach 2: MRZ-specific preprocessing
+        # Approach 2: Direct method (minimal preprocessing - fast)
+        processed_images.append(preprocess_for_passport_ocr(img_cv, method="direct"))
+        
+        # Approach 3: MRZ-specific preprocessing (good for MRZ detection)
         processed_images.append(preprocess_for_passport_ocr(img_cv, method="mrz_focused"))
         
-        # Approach 3: High contrast preprocessing
-        processed_images.append(preprocess_for_passport_ocr(img_cv, method="high_contrast"))
-        
-        # Approach 4: Detect and extract MRZ region specifically
+        # Approach 4: Detect and extract MRZ region specifically (if found)
         mrz_region = detect_mrz_region(img_cv)
         if mrz_region is not None:
             processed_images.append(preprocess_for_passport_ocr(mrz_region, method="mrz_only"))
+        
+        # Skip slower methods: high_contrast, advanced_threshold (can be added back if needed)
         
         if verbose:
             print(f"  → Generated {len(processed_images)} preprocessed variants")
         
         best_result = None
         best_confidence = 0
+        all_extracted_texts = []  # Store all extraction attempts for debugging
         
-        # Try OCR with different configurations on each preprocessed image
+        # Try OCR with different configurations on each preprocessed image (Optimized for speed)
         ocr_configs = [
-            # MRZ-specific config with character whitelist
+            # PSM 6: Single uniform block (FAST - most effective for passports)
+            r'--psm 6',
+            # Direct OCR without special config (FAST)
+            r'',
+            # MRZ-specific config with character whitelist (FAST)
+            r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',
+            # Single text line mode for MRZ (MEDIUM)
             r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',
-            # Single text line mode for MRZ
-            r'--oem 3 --psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',
-            # Single word mode
-            r'--oem 3 --psm 8',
-            # Raw line mode
-            r'--oem 3 --psm 13',
-            # Default with character restriction
-            r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<'
+            # Single word mode (FAST)
+            r'--oem 3 --psm 8'
+            # PSM 12 removed - too slow for production use
         ]
         
         for i, processed_img in enumerate(processed_images):
@@ -90,7 +105,52 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                     if verbose:
                         print(f"    → Trying OCR variant {i+1}.{j+1}...")
                     
-                    extracted_text = pytesseract.image_to_string(processed_img, config=config)
+                    # Early exit optimization - skip remaining configs if we have a very good result
+                    if best_confidence > 0.9 and j > 1:
+                        if verbose:
+                            print(f"      ⏭ Skipping remaining configs (excellent result: {best_confidence:.2f})")
+                        break
+                    
+                    import time
+                    import threading
+                    
+                    start_time = time.time()
+                    extracted_text = None
+                    timeout_occurred = False
+                    
+                    # Function to run OCR in a separate thread
+                    def run_ocr():
+                        nonlocal extracted_text
+                        try:
+                            extracted_text = pytesseract.image_to_string(processed_img, config=config)
+                        except Exception as e:
+                            extracted_text = None
+                    
+                    # Run OCR with 3-second timeout
+                    ocr_thread = threading.Thread(target=run_ocr)
+                    ocr_thread.daemon = True
+                    ocr_thread.start()
+                    ocr_thread.join(timeout=3.0)  # 3-second timeout
+                    
+                    processing_time = time.time() - start_time
+                    
+                    # Check if timeout occurred
+                    if ocr_thread.is_alive():
+                        timeout_occurred = True
+                        if verbose:
+                            print(f"      ⏭ Skipped (timeout after 3.0s)")
+                        continue
+                    
+                    if verbose and processing_time > 1:
+                        print(f"      ⏱ Took {processing_time:.1f}s")
+                    
+                    # Store all extraction attempts for debugging
+                    all_extracted_texts.append({
+                        "method": f"variant_{i+1}.{j+1}",
+                        "config": config,
+                        "text": extracted_text,
+                        "length": len(extracted_text.strip()) if extracted_text else 0
+                    })
                     
                     if not extracted_text or len(extracted_text.strip()) < 10:
                         continue
@@ -109,6 +169,12 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                         if verbose:
                             print(f"      ✓ High quality result found, stopping search")
                         break
+                    
+                    # Also break if we get a decent result and have tried multiple variants
+                    if text_quality > 0.6 and (i > 0 or j > 2):
+                        if verbose:
+                            print(f"      ✓ Good result found, stopping search early")
+                        break
                         
                 except Exception as e:
                     if verbose:
@@ -118,6 +184,27 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
             # Break outer loop if high quality found
             if best_confidence > 0.8:
                 break
+        
+        # Save all extracted texts for debugging (similar to get_all_text methods)
+        if verbose and all_extracted_texts:
+            try:
+                debug_text = f"=== Tesseract OCR Debug Results ===\n\n"
+                debug_text += f"Total extraction attempts: {len(all_extracted_texts)}\n"
+                debug_text += f"Best confidence score: {best_confidence:.2f}\n\n"
+                
+                for i, attempt in enumerate(all_extracted_texts, 1):
+                    debug_text += f"--- Attempt {i}: {attempt['method']} ---\n"
+                    debug_text += f"Config: {attempt['config']}\n"
+                    debug_text += f"Text length: {attempt['length']} characters\n"
+                    debug_text += f"Text:\n{attempt['text']}\n\n"
+                
+                # Save to get_all_text folder for consistency
+                # debug_file = "get_all_text/tesseract_debug_output.txt"
+                # with open(debug_file, "w", encoding="utf-8") as f:
+                #     f.write(debug_text)
+                # print(f"  → Debug output saved to {debug_file}")
+            except Exception as e:
+                print(f"  → Could not save debug output: {e}")
         
         if not best_result:
             if verbose:
@@ -417,7 +504,32 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         if passport_data.get("expiry_date"):
             passport_data["expiry_date"] = format_mrz_date(passport_data["expiry_date"])
         
+        # Check field validation threshold
+        from utils import check_field_validation_threshold
+        validation_check = check_field_validation_threshold(mrz_text, threshold=10, verbose=verbose)
+        
+        if not validation_check["threshold_met"]:
+            if verbose:
+                print(f"⚠️  Field validation threshold not met: {validation_check['valid_count']}/10 fields valid")
+                print(f"   → Proceeding to next validation method...")
+            
+            # Save validation failure to temp file for user
+            if user_id:
+                from utils import save_validation_failure
+                save_validation_failure(user_id, "Tesseract", passport_data, validation_check["field_results"], mrz_text, all_text)
+            
+            return {
+                "success": False,
+                "passport_data": passport_data,
+                "mrz_text": mrz_text,
+                "method_used": "Tesseract",
+                "error": f"Field validation threshold not met: {validation_check['valid_count']}/10 fields valid",
+                "validation_summary": validation_check
+            }
+        
         if verbose:
+            print(f"✅ Field validation threshold met: {validation_check['valid_count']}/10 fields valid")
+            print(f"   → Returning validated passport data...")
             print(f"  ✓ Passport data extracted successfully")
             print(f"    Surname: {passport_data.get('surname', '')}")
             print(f"    Given Names: {passport_data.get('given_names', '')}")
@@ -429,7 +541,8 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
             "passport_data": passport_data,
             "mrz_text": mrz_text,
             "method_used": "Tesseract",
-            "error": ""
+            "error": "",
+            "validation_summary": validation_check
         }
     
     except Exception as e:
@@ -555,6 +668,47 @@ def preprocess_for_passport_ocr(img: np.ndarray, method: str = "enhanced") -> np
         binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
         
         return binary
+    
+    elif method == "direct":
+        # Direct method (from get_all_text/test_new_test_without_modifications.py)
+        # Minimal preprocessing - just return grayscale
+        return gray
+    
+    elif method == "advanced_threshold":
+        # Advanced preprocessing with multiple thresholding (from get_all_text/test_new_test_with_modifications.py)
+        
+        # 1. Upscale for better recognition
+        height, width = gray.shape
+        gray = cv2.resize(gray, (width * 2, height * 2), interpolation=cv2.INTER_CUBIC)
+        
+        # 2. Apply multiple thresholding techniques and combine results
+        
+        # Otsu thresholding
+        _, thresh1 = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
+        # Adaptive thresholding
+        thresh2 = cv2.adaptiveThreshold(
+            gray, 255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            11, 2
+        )
+        
+        # Denoise the Otsu result
+        denoised = cv2.medianBlur(thresh1, 3)
+        
+        # Combine the best of both thresholding methods
+        # Use bitwise operations to get the intersection of good regions
+        combined = cv2.bitwise_and(thresh1, thresh2)
+        
+        # If combined result is too sparse, fall back to denoised Otsu
+        white_pixels = cv2.countNonZero(combined)
+        total_pixels = combined.shape[0] * combined.shape[1]
+        
+        if white_pixels / total_pixels < 0.1:  # Less than 10% white pixels
+            return denoised
+        else:
+            return combined
     
     else:
         # Default: simple preprocessing
@@ -909,7 +1063,8 @@ def extract_passport_data_from_text(text: str, verbose: bool = False) -> Dict:
     # Sex pattern
     sex_match = re.search(r'(?:SEX|GENDER)\s*:?\s*([MFX])', text, re.IGNORECASE)
     if sex_match:
-        data["sex"] = sex_match.group(1).upper()
+        from sex_field_normalizer import normalize_sex_field
+        data["sex"] = normalize_sex_field(sex_match.group(1).upper())
     
     if verbose:
         print(f"    Extracted data: {data}")
@@ -924,14 +1079,15 @@ def reconstruct_mrz_from_data(data: Dict, verbose: bool = False) -> str:
     """
     try:
         # Required fields
-        country = data.get("country_code", "XXX")[:3]
-        surname = data.get("surname", "UNKNOWN")[:20]
-        given_names = data.get("given_names", "UNKNOWN")[:15]
-        passport_num = data.get("passport_number", "000000000")[:9]
+        country = data.get("country_code", "")[:3]
+        surname = data.get("surname", "")[:20]
+        given_names = data.get("given_names", "")[:15]
+        passport_num = data.get("passport_number", "")[:9]
         nationality = data.get("nationality", country)[:3]
-        dob = data.get("date_of_birth", "000000")[:6]
-        sex = data.get("sex", "<")[:1]
-        expiry = data.get("expiry_date", "000000")[:6]
+        dob = data.get("date_of_birth", "")[:6]
+        from sex_field_normalizer import normalize_sex_field
+        sex = normalize_sex_field(data.get("sex", "<"))[:1]
+        expiry = data.get("expiry_date", "")[:6]
         
         # Build Line 1: P<CCCSSSSSSSSSSSS<<GGGGGGGGGGGGGGGGGGG
         name_field = f"{surname}<<{given_names.replace(' ', '<')}"

@@ -9,6 +9,7 @@ import re
 from typing import Dict
 from gemini_ocr import extract_text_with_gemini
 from country_code import get_country_info
+from sex_field_normalizer import normalize_sex_field
 
 
 class AIExtractionSuccess(Exception):
@@ -507,7 +508,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
                         "country_iso": country_details["country_iso"],
                         "nationality": country_details["nationality"],
                         "date_of_birth": details.get('birth_date', ''),
-                        "sex": details.get('sex', ''),
+                        "sex": normalize_sex_field(details.get('sex', '')),
                         "expiry_date": details.get('expiry_date', ''),
                         "personal_number": details.get('optional_data', '').replace('<', '').strip()
                     }
@@ -574,7 +575,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
             "country_iso": country_details["country_iso"],
             "nationality": country_details["nationality"],
             "date_of_birth": date_of_birth,
-            "sex": validation_data.get('sex', ''),
+            "sex": normalize_sex_field(validation_data.get('sex', '')),
             "expiry_date": expiry_date,
             "personal_number": ""
         }

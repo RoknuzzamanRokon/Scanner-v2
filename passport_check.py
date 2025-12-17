@@ -125,7 +125,12 @@ def _validate_line2_fields(line2: str) -> Dict[str, str]:
     
     # Sex (Position 20)
     sex = line2[20:21]
-    if sex in ['M', 'F', 'X', '0', '1', '2']:  # Some countries use 0=unspecified, 1=male, 2=female
+    
+    # Normalize sex field (convert 0->M, 1->F, etc.)
+    from sex_field_normalizer import normalize_sex_field
+    normalized_sex = normalize_sex_field(sex)
+    
+    if normalized_sex in ['M', 'F', 'X', '<']:
         result["sex"] = "Valid"
     else:
         result["sex"] = "Invalid"
@@ -342,46 +347,46 @@ def _validate_checksum(data: str, check_digit: str) -> bool:
         return False
 
 
-# Example usage and testing
-if __name__ == "__main__":
-    print("PASSPORT FIELD VALIDATION TESTER")
-    print("=" * 50)
+# # Example usage and testing
+# if __name__ == "__main__":
+#     print("PASSPORT FIELD VALIDATION TESTER")
+#     print("=" * 50)
     
-    # Test with Syrian passport MRZ
-    print("\n1. Testing Syrian Passport MRZ:")
-    print("-" * 30)
-    sample_mrz1 = """P<UTOQUEST<<AMELIA<MARY<<<<<<<<<<<<<<<<<<<<<
-S012345674UTO8704234F3208265<<<<<<<<<<<<<<<2"""
+#     # Test with Syrian passport MRZ
+#     print("\n1. Testing Syrian Passport MRZ:")
+#     print("-" * 30)
+#     sample_mrz1 = """P<UTOQUEST<<AMELIA<MARY<<<<<<<<<<<<<<<<<<<<<
+# S012345674UTO8704234F3208265<<<<<<<<<<<<<<<2"""
     
-    result1 = validate_passport_fields(sample_mrz1)
+#     result1 = validate_passport_fields(sample_mrz1)
     
-    for field, status in result1.items():
-        status_icon = "✅" if status == "Valid" else "❌"
-        print(f"{status_icon} {field:20}: {status}")
+#     for field, status in result1.items():
+#         status_icon = "✅" if status == "Valid" else "❌"
+#         print(f"{status_icon} {field:20}: {status}")
     
-    # Test with Bangladesh passport MRZ
-    print("\n2. Testing Bangladesh Passport MRZ:")
-    print("-" * 30)
-    sample_mrz2 = """P<UTOQUEST<<AMELIA<MARY<<<<<<<<<<<<<<<<<<<<<
-S012345674UTO8704234F3208265<<<<<<<<<<<<<<<2"""
+#     # Test with Bangladesh passport MRZ
+#     print("\n2. Testing Bangladesh Passport MRZ:")
+#     print("-" * 30)
+#     sample_mrz2 = """P<UTOQUEST<<AMELIA<MARY<<<<<<<<<<<<<<<<<<<<<
+# S012345674UTO8704234F3208265<<<<<<<<<<<<<<<2"""
     
-    result2 = validate_passport_fields(sample_mrz2)
+#     result2 = validate_passport_fields(sample_mrz2)
     
-    for field, status in result2.items():
-        status_icon = "✅" if status == "Valid" else "❌"
-        print(f"{status_icon} {field:20}: {status}")
+#     for field, status in result2.items():
+#         status_icon = "✅" if status == "Valid" else "❌"
+#         print(f"{status_icon} {field:20}: {status}")
     
-    # Test with invalid MRZ
-    print("\n3. Testing Invalid MRZ (wrong format):")
-    print("-" * 30)
-    invalid_mrz = """INVALID_MRZ_FORMAT
-ALSO_INVALID_FORMAT"""
+#     # Test with invalid MRZ
+#     print("\n3. Testing Invalid MRZ (wrong format):")
+#     print("-" * 30)
+#     invalid_mrz = """INVALID_MRZ_FORMAT
+# ALSO_INVALID_FORMAT"""
     
-    result3 = validate_passport_fields(invalid_mrz)
+#     result3 = validate_passport_fields(invalid_mrz)
     
-    for field, status in result3.items():
-        status_icon = "✅" if status == "Valid" else "❌"
-        print(f"{status_icon} {field:20}: {status}")
+#     for field, status in result3.items():
+#         status_icon = "✅" if status == "Valid" else "❌"
+#         print(f"{status_icon} {field:20}: {status}")
     
-    print("\n" + "=" * 50)
-    print("Testing completed!")
+#     print("\n" + "=" * 50)
+#     print("Testing completed!")

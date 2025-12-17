@@ -10,6 +10,7 @@ from typing import Dict
 from fastmrz import FastMRZ
 from country_code import get_country_info
 from utils import format_mrz_date
+from sex_field_normalizer import normalize_sex_field
 
 
 def format_mrz_lines(mrz_text: str, verbose: bool = False) -> str:
@@ -150,7 +151,7 @@ def format_mrz_lines(mrz_text: str, verbose: bool = False) -> str:
     return clean_mrz
 
 
-def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = True) -> Dict:
+def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = True, user_id: str = None) -> Dict:
     """
     STEP 2: FastMRZ Fallback Validation
     
@@ -168,6 +169,17 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
     try:
         if verbose:
             print(f"  → Processing with FastMRZ...")
+        
+        # Check for previous validation failures
+        if user_id:
+            from utils import load_validation_failures, analyze_previous_failures
+            previous_failures = load_validation_failures(user_id)
+            if previous_failures:
+                analysis = analyze_previous_failures(previous_failures, "FastMRZ")
+                if analysis["suggestions"]:
+                    print(f"💡 Suggestions based on previous failures:")
+                    for suggestion in analysis["suggestions"]:
+                        print(f"   → {suggestion}")
         
         # Convert PIL Image to OpenCV format
         img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -448,7 +460,7 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
                 "country_iso": country_iso,
                 "nationality": nationality_name,
                 "date_of_birth": date_of_birth,
-                "sex": sex if sex in ['M', 'F', 'X', '<'] else '<',
+                "sex": normalize_sex_field(sex),
                 "expiry_date": expiry_date,
                 "personal_number": personal_number
             }
@@ -564,6 +576,33 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
             total_count = len(field_results)
             print(f"\nField Validation Summary: {valid_count}/{total_count} fields are valid\n")
             
+            # Check validation threshold - if less than 10/10 valid fields, proceed to next method
+            if valid_count < 10:
+                print(f"⚠️  Field validation threshold not met: {valid_count}/10 fields valid")
+                print(f"   → Proceeding to next validation method...")
+                
+                # Save validation failure to temp file for user
+                from utils import save_validation_failure
+                if 'user_id' in locals() and user_id:
+                    save_validation_failure(user_id, "FastMRZ", passport_data, field_results, mrz_text)
+                
+                return {
+                    "success": False,
+                    "passport_data": passport_data,
+                    "mrz_text": mrz_text,
+                    "method_used": "FastMRZ",
+                    "error": f"Field validation threshold not met: {valid_count}/10 fields valid",
+                    "validation_summary": {
+                        "valid_count": valid_count,
+                        "total_count": total_count,
+                        "field_results": field_results,
+                        "threshold_met": False
+                    }
+                }
+            
+            print(f"✅ Field validation threshold met: {valid_count}/10 fields valid")
+            print(f"   → Returning validated passport data...")
+            
             # Final passport full data
             print("Final passport full data:")
             print("=" * 50)
@@ -596,7 +635,13 @@ def validate_passport_with_fastmrz_fallback(image: Image.Image, verbose: bool = 
                 "passport_data": passport_data,
                 "mrz_text": mrz_text,
                 "method_used": "FastMRZ",
-                "error": ""
+                "error": "",
+                "validation_summary": {
+                    "valid_count": valid_count,
+                    "total_count": total_count,
+                    "field_results": field_results,
+                    "threshold_met": True
+                }
             }
         
         finally:

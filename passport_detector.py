@@ -122,7 +122,12 @@ def passport_validation_checker(mrz_text: str, verbose: bool = True) -> Dict:
         # Sex (pos 20)
         max_score += 1
         sex = line2[20]
-        if sex in ['M', 'F', 'X', '<']:
+        
+        # Normalize sex field (handle 0->M, 1->F mapping)
+        from sex_field_normalizer import normalize_sex_field
+        normalized_sex = normalize_sex_field(sex)
+        
+        if normalized_sex in ['M', 'F', 'X', '<']:
             validation_score += 1
         else:
             issues.append(f"Invalid sex field: {sex}")
@@ -158,6 +163,10 @@ def passport_validation_checker(mrz_text: str, verbose: bool = True) -> Dict:
             surname = name_parts[0].replace('<', ' ').strip() if len(name_parts) > 0 else ""
             given_names = name_parts[1].replace('<', ' ').strip() if len(name_parts) > 1 else ""
             
+            # Normalize sex field (convert 0->M, 1->F, etc.)
+            from sex_field_normalizer import normalize_sex_field
+            normalized_sex = normalize_sex_field(sex)
+            
             passport_data = {
                 "document_type": doc_type[0] if doc_type else "P",
                 "country_code": country_code,
@@ -166,7 +175,7 @@ def passport_validation_checker(mrz_text: str, verbose: bool = True) -> Dict:
                 "passport_number": passport_num,
                 "nationality": nationality,
                 "date_of_birth": dob,
-                "sex": sex,
+                "sex": normalized_sex,
                 "expiry_date": expiry,
                 "personal_number": line2[28:42].replace('<', '').strip()
             }
