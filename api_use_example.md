@@ -152,7 +152,8 @@ curl -X POST "http://localhost:8000/scan" \
     "step3_easyocr": "Skipped (Early Exit)",
     "step4_tesseract": "Skipped (Early Exit)",
     "step5_validation": "Skipped (Early Exit)",
-    "step6_ai_parser": "Skipped (Early Exit)"
+    "step6_ittcheck": "Skipped (Early Exit)",
+    "step7_ai_parser": "Skipped (Early Exit)"
   },
   "step_timings": {
     "image_loading": "0.45s",
@@ -182,7 +183,8 @@ curl -X POST "http://localhost:8000/scan" \
     "step3_easyocr": "Failed",
     "step4_tesseract": "Failed",
     "step5_validation": "Skipped (No MRZ)",
-    "step6_ai_parser": "Failed"
+    "step6_ittcheck": "Failed",
+    "step7_ai_parser": "Failed"
   },
   "step_timings": {
     "image_loading": "0.30s",
@@ -292,7 +294,8 @@ curl -X POST "http://localhost:8000/step-config" \
 | STEP3 | EasyOCR     | EasyOCR fallback validation       |
 | STEP4 | Tesseract   | Tesseract OCR fallback            |
 | STEP5 | Validation  | Passport validation checker       |
-| STEP6 | AI Parser   | Gemini AI parser (final fallback) |
+| STEP6 | ITTCheck    | ITTCheck validation               |
+| STEP7 | AI Parser   | Gemini AI parser (final fallback) |
 
 ---
 
@@ -424,7 +427,8 @@ if __name__ == "__main__":
         "STEP3": False,  # EasyOCR
         "STEP4": False,  # Tesseract
         "STEP5": False,  # Validation
-        "STEP6": True    # AI Parser
+        "STEP6": False,  # ITTCheck
+        "STEP7": True    # AI Parser
     }
     result = scan_with_custom_steps("https://example.com/passport.jpg", custom_steps)
     print("Custom scan result:", result)
@@ -612,8 +616,10 @@ STEP3 (EasyOCR) → Success? Return result
 STEP4 (Tesseract) → Success? Return result
     ↓ Failed
 STEP5 (Validation) → Validate extracted data
-    ↓
-STEP6 (AI Parser) → Final fallback with AI
+    ↓ Failed
+STEP6 (ITTCheck) → ITTCheck validation
+    ↓ Failed
+STEP7 (AI Parser) → Final fallback with AI
 ```
 
 ### Performance Tips

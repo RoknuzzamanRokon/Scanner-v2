@@ -130,7 +130,7 @@ def _validate_line2_fields(line2: str) -> Dict[str, str]:
     from sex_field_normalizer import normalize_sex_field
     normalized_sex = normalize_sex_field(sex)
     
-    if normalized_sex in ['M', 'F', 'X', '<']:
+    if normalized_sex in ['M', 'F', 'X']:
         result["sex"] = "Valid"
     else:
         result["sex"] = "Invalid"

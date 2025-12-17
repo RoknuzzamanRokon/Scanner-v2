@@ -389,10 +389,76 @@ def scan_passport(
         
 
 
-        # STEP 6: AI Parser (Final Fallback) - Only if AI=ON and Step Enabled
-        if use_gemini and is_step_enabled("STEP6", step_config_override):
+        # STEP 6: ITTCheck Validation
+        if is_step_enabled("STEP6", step_config_override):
             print("\n" + "-"*60)
-            print("🤖 STEP 6: AI Parser (Gemini - Final Fallback)")
+            print("🔍 STEP 6: ITTCheck Validation")
+            print("-"*60)
+            
+            step_start = time.time()
+            try:
+                from ittcheck import validate_passport_with_ittcheck
+                ittcheck_result = validate_passport_with_ittcheck(image, verbose=True, user_id=user_id)
+                
+
+                
+                step_timings["step6_ittcheck"] = f"{time.time() - step_start:.2f}s"
+                working_process_step["step6_ittcheck"] = ittcheck_result.get("method_used", "ITTCheck")
+                
+                if ittcheck_result.get("success", False):
+                    print("\n✅ SUCCESS via ITTCheck")
+                    
+                    # Remove validation failure file on success
+                    if user_id:
+                        from utils import remove_validation_failures
+                        remove_validation_failures(user_id)
+                    
+                    # Clean up user temp folder on success
+                    if user_folder_path:
+                        from utils import cleanup_user_folder
+                        cleanup_user_folder(user_folder_path)
+                    
+                    total_time = time.time() - total_start_time
+                    
+                    return {
+                        "success": True,
+                        "passport_data": {
+                            "processVia": "ITTCheck",
+                            **ittcheck_result.get("passport_data", {})
+                        },
+                        "mrz_text": ittcheck_result.get("mrz_text", ""),
+                        "working_process_step": working_process_step,
+                        "step_timings": step_timings,
+                        "total_time": f"{total_time:.2f}s",
+                        "error": "",
+                        "validation_reason": "",
+                        "validation_confidence": ""
+                    }
+                
+                print(f"  ⚠ ITTCheck failed: {ittcheck_result.get('error', 'Unknown error')}")
+                
+            except ImportError as e:
+                print(f"  ⚠ ITTCheck not available: {e}")
+                ittcheck_result = {"error": f"ITTCheck not available: {e}"}
+                step_timings["step6_ittcheck"] = f"{time.time() - step_start:.2f}s"
+                working_process_step["step6_ittcheck"] = "Skipped (Import Error)"
+            except Exception as e:
+                print(f"  ⚠ ITTCheck error: {e}")
+                ittcheck_result = {"error": f"ITTCheck processing error: {str(e)}"}
+                step_timings["step6_ittcheck"] = f"{time.time() - step_start:.2f}s"
+                working_process_step["step6_ittcheck"] = "Failed"
+        else:
+            print("\n" + "-"*60)
+            print("⏭ STEP 6: ITTCheck Validation - SKIPPED (DISABLED)")
+            print("-"*60)
+            ittcheck_result = {"error": "Step disabled", "success": False}
+            step_timings["step6_ittcheck"] = "0.00s"
+            working_process_step["step6_ittcheck"] = "Skipped (Disabled)"
+
+        # STEP 7: AI Parser (Final Fallback) - Only if AI=ON and Step Enabled
+        if use_gemini and is_step_enabled("STEP7", step_config_override):
+            print("\n" + "-"*60)
+            print("🤖 STEP 7: AI Parser (Gemini - Final Fallback)")
             print("-"*60)
             
             step_start = time.time()
@@ -403,8 +469,8 @@ def scan_passport(
             else:
                 ai_result = gemini_ocr(image, is_url=False, user_id=user_id)
             
-            step_timings["step6_ai_parser"] = f"{time.time() - step_start:.2f}s"
-            working_process_step["step6_ai_parser"] = "Gemini AI"
+            step_timings["step7_ai_parser"] = f"{time.time() - step_start:.2f}s"
+            working_process_step["step7_ai_parser"] = "Gemini AI"
             
             if ai_result.get("success", False):
                 print("\n✅ SUCCESS via AI Parser")
@@ -434,13 +500,13 @@ def scan_passport(
             print(f"  ⚠ AI Parser failed: {ai_result.get('error', 'Unknown error')}")
         else:
             if not use_gemini:
-                print("\n⏭ STEP 6: AI Parser - SKIPPED (AI=OFF)")
-                working_process_step["step6_ai_parser"] = "Skipped (AI=OFF)"
-            elif not is_step_enabled("STEP6", step_config_override):
-                print("\n⏭ STEP 6: AI Parser - SKIPPED (DISABLED)")
-                working_process_step["step6_ai_parser"] = "Skipped (Disabled)"
+                print("\n⏭ STEP 7: AI Parser - SKIPPED (AI=OFF)")
+                working_process_step["step7_ai_parser"] = "Skipped (AI=OFF)"
+            elif not is_step_enabled("STEP7", step_config_override):
+                print("\n⏭ STEP 7: AI Parser - SKIPPED (DISABLED)")
+                working_process_step["step7_ai_parser"] = "Skipped (Disabled)"
             else:
-                working_process_step["step6_ai_parser"] = "Skipped"
+                working_process_step["step7_ai_parser"] = "Skipped"
         
         # All methods failed
         print("\n" + "="*60)

@@ -5,11 +5,13 @@
 # STEP3 = EasyOCR Fallback
 # STEP4 = Tesseract OCR Fallback
 # STEP5 = Passport Validation Checker
-# STEP6 = AI Parser
+# STEP6 = ITTCheck
+# STEP7 = AI Parser
 
 STEP1=on
 STEP2=on
 STEP3=on
 STEP4=on
 STEP5=on
-STEP6=off
+STEP6=on
+STEP7=on

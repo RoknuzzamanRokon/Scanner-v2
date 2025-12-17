@@ -209,7 +209,12 @@
 - **Threshold-Based**: Requires ≥50% confidence to proceed
 - **Fallback Trigger**: Low confidence triggers AI parser (if enabled)
 
-### STEP 6: AI Parser (Final Fallback)
+### STEP 6: ITTCheck Validation
+
+- **ITTCheck Integration**: Custom validation method
+- **Fallback Trigger**: Previous methods failed
+
+### STEP 7: AI Parser (Final Fallback)
 
 - **Gemini AI Integration**: Advanced OCR and text analysis
 - **Full Document Analysis**: Processes entire document, not just MRZ
@@ -319,7 +324,15 @@
        # Returns: {"is_valid": bool, "confidence_score": float, "reason": str, ...}
    ```
 
-6. **STEP 6: AI Parser** (`gemini_passport_parser.py`)
+6. **STEP 6: ITTCheck** (`ittcheck.py`)
+
+   ```python
+   def validate_passport_with_ittcheck(image, verbose=True, user_id=None):
+       # ITTCheck validation implementation
+       return {"success": True/False, "passport_data": {...}}
+   ```
+
+7. **STEP 7: AI Parser** (`gemini_passport_parser.py`)
    ```python
    def gemini_ocr(image_input, is_url=True, user_id=None):
        # Single-phase AI approach:
@@ -362,7 +375,13 @@ def scan_passport(image_url=None, image_base64=None, document_type="passport", u
                 return success_response_with_timing("Tesseract")  # Early termination
             # AI=ON: Continue to Step 6 for enhanced extraction
 
-    # STEP 6: AI Parser (if use_gemini=True)
+    # STEP 6: ITTCheck (if enabled)
+    if is_step_enabled("STEP6"):
+        ittcheck_result = validate_passport_with_ittcheck(image, user_id=user_id)
+        if ittcheck_result["success"]:
+            return success_response("ITTCheck")
+
+    # STEP 7: AI Parser (if use_gemini=True)
     if use_gemini:
         ai_result = gemini_ocr(image_input, is_url=bool(image_url), user_id=user_id)
         if ai_result.get("success", False):

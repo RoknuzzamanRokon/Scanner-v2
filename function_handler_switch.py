@@ -23,7 +23,8 @@ class StepController:
             "STEP3": True,   # EasyOCR
             "STEP4": True,   # Tesseract
             "STEP5": True,   # Validation Checker
-            "STEP6": True,   # AI Parser
+            "STEP6": True,   # ITTCheck
+            "STEP7": True,   # AI Parser
         }
         
         # Load settings from environment variables
@@ -113,7 +114,8 @@ class StepController:
             "STEP3": "EasyOCR Fallback",
             "STEP4": "Tesseract OCR Fallback",
             "STEP5": "Passport Validation Checker",
-            "STEP6": "AI Parser (Gemini)"
+            "STEP6": "ITTCheck",
+            "STEP7": "AI Parser (Gemini)"
         }
         
         for step, enabled in self.steps.items():
@@ -134,7 +136,8 @@ class StepController:
                 f.write("# STEP3 = EasyOCR Fallback\n")
                 f.write("# STEP4 = Tesseract OCR Fallback\n")
                 f.write("# STEP5 = Passport Validation Checker\n")
-                f.write("# STEP6 = AI Parser (Gemini)\n\n")
+                f.write("# STEP6 = ITTCheck\n")
+                f.write("# STEP7 = AI Parser (Gemini)\n\n")
                 
                 for step, enabled in self.steps.items():
                     value = "on" if enabled else "off"
