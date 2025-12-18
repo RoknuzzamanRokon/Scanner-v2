@@ -262,6 +262,12 @@ def scan_passport(
             step_timings["step3_easyocr"] = "0.00s"
             working_process_step["step3_easyocr"] = "Skipped (Disabled)"
         
+        # Check if any previous step validated document as passport
+        previous_passport_validation = (
+            passporteye_result.get("passport_validated", False) or
+            fastmrz_result.get("passport_validated", False)
+        )
+        
         # STEP 4: Tesseract OCR Fallback Validation
         if is_step_enabled("STEP4", step_config_override):
             print("\n" + "-"*60)
@@ -271,7 +277,7 @@ def scan_passport(
             step_start = time.time()
             try:
                 from tesseractOCR import validate_passport_with_tesseract_fallback
-                tesseract_result = validate_passport_with_tesseract_fallback(image, verbose=True, user_id=user_id)
+                tesseract_result = validate_passport_with_tesseract_fallback(image, verbose=True, user_id=user_id, previous_passport_validation=previous_passport_validation)
                 step_timings["step4_tesseract"] = f"{time.time() - step_start:.2f}s"
                 working_process_step["step4_tesseract"] = tesseract_result.get("method_used", "Tesseract")
                 

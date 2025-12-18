@@ -150,7 +150,11 @@ def validate_passport_with_easyocr_fallback(image: Image.Image, verbose: bool = 
             print(f"    Passport word found: {is_passport_word}")
             print(f"    MRZ pattern found: {has_mrz_chars}")
         
-        if not (is_passport_word or has_mrz_chars):
+        # Check passport validation
+        if is_passport_word or has_mrz_chars:
+            if verbose:
+                print(f"  ✓ Valid for passport image")
+        else:
             if verbose:
                 print(f"  ✗ Document doesn't appear to be a passport")
             

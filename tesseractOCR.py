@@ -22,7 +22,7 @@ _country_info_cache = {}
 # Cache for image analysis results to avoid redundant calculations
 _image_analysis_cache = {}
 
-def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool = True, user_id: str = None) -> Dict:
+def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool = True, user_id: str = None, previous_passport_validation: bool = False) -> Dict:
     """
     Super Optimized Tesseract OCR Fallback Validation
     
@@ -114,7 +114,8 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         has_passport_keyword = any(keyword in all_text.lower() for keyword in passport_keywords)
         has_enough_brackets = angle_bracket_count >= 3
         
-        if has_passport_keyword or has_enough_brackets:
+        # If previous step already validated as passport, override local validation
+        if previous_passport_validation or has_passport_keyword or has_enough_brackets:
             if verbose:
                 print(f"  ✓ Valid for passport image.")
         else:

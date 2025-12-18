@@ -172,7 +172,9 @@ def _validate_name_field(name_field: str) -> tuple:
         # Validate surname
         surname_status = "Invalid"
         if len(surname_part) >= 1 and re.match(r'^[A-Z]+$', surname_part):
-            surname_status = "Valid"
+            # Check for repeated characters (more than 2 consecutive same characters)
+            if not _has_excessive_repeated_chars(surname_part):
+                surname_status = "Valid"
         
         # Validate given names
         given_names_status = "Invalid"
@@ -185,7 +187,9 @@ def _validate_name_field(name_field: str) -> tuple:
                 if re.match(r'^[A-Z0-9<]+$', given_names_clean):
                     # Check that it contains at least one letter
                     if re.search(r'[A-Z]', given_names_clean):
-                        given_names_status = "Valid"
+                        # Check for repeated characters (more than 2 consecutive same characters)
+                        if not _has_excessive_repeated_chars(given_names_clean):
+                            given_names_status = "Valid"
         elif len(given_names_part.rstrip('<')) == 0:
             # Empty given names part (only chevrons) - some passports have only surname
             given_names_status = "Valid"
@@ -310,6 +314,27 @@ def _validate_date_field(date_str: str, date_type: str) -> str:
         
     except (ValueError, TypeError):
         return "Invalid"
+
+
+def _has_excessive_repeated_chars(text: str) -> bool:
+    """
+    Check if text has more than 2 consecutive repeated characters
+    
+    Args:
+        text: Text to check
+        
+    Returns:
+        True if text has excessive repeated characters (invalid)
+        False if text is valid
+    """
+    try:
+        # Check for 3 or more consecutive same characters
+        for i in range(len(text) - 2):
+            if text[i] == text[i + 1] == text[i + 2]:
+                return True  # Found 3+ consecutive same characters
+        return False
+    except Exception:
+        return True  # Assume invalid on error
 
 
 def _validate_checksum(data: str, check_digit: str) -> bool:

@@ -789,7 +789,8 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True, user_id=Non
                             "mrz_text": mrz_text,
                             "method_used": "PassportEye",
                             "error": f"Field validation threshold not met: {validation_check['valid_count']}/10 fields valid",
-                            "validation_summary": validation_check
+                            "validation_summary": validation_check,
+                            "passport_validated": True  # Document validated as passport but failed field validation
                         }
                     
                     if verbose:
@@ -841,7 +842,8 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True, user_id=Non
                             "mrz_text": mrz_text,
                             "method_used": "PassportEye",
                             "error": f"Field validation threshold not met: {validation_check['valid_count']}/10 fields valid",
-                            "validation_summary": validation_check
+                            "validation_summary": validation_check,
+                            "passport_validated": True  # Document validated as passport but failed field validation
                         }
                     
                     if verbose:
@@ -866,7 +868,8 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True, user_id=Non
                     "method_used": "PassportEye",
                     "confidence": result.get('valid_score', 0) / 100.0,
                     "error": "",
-                    "validation_summary": validation_check
+                    "validation_summary": validation_check,
+                    "passport_validated": True  # Document validated as passport
                 }
             else:
                 if verbose:
@@ -877,7 +880,8 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True, user_id=Non
                     "passport_data": {},
                     "mrz_text": "",
                     "method_used": "PassportEye",
-                    "error": "No MRZ detected by PassportEye"
+                    "error": "No MRZ detected by PassportEye",
+                    "passport_validated": False  # No passport detected
                 }
                 
         finally:
@@ -894,5 +898,6 @@ def validate_passport_with_PassportEye_fallback(image, verbose=True, user_id=Non
             "passport_data": {},
             "mrz_text": "",
             "method_used": "PassportEye",
-            "error": f"PassportEye processing error: {str(e)}"
+            "error": f"PassportEye processing error: {str(e)}",
+            "passport_validated": False  # Error occurred, no validation
         }
