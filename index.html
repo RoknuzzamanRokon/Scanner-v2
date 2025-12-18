@@ -1101,6 +1101,280 @@
           word-break: break-word;
         }
       }
+
+      /* Image Preview Modal */
+      .image-modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.9);
+        animation: fadeIn 0.3s ease;
+      }
+
+      .image-modal.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal-content {
+        position: relative;
+        max-width: 90%;
+        max-height: 90%;
+        margin: auto;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+      }
+
+      .modal-close:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .modal-image-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: #f8fafc;
+        min-height: 400px;
+      }
+
+      .modal-image {
+        max-width: 100%;
+        max-height: 70vh;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      }
+
+      .modal-footer {
+        padding: 16px 20px;
+        background: white;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .modal-info {
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      .modal-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .modal-btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .modal-btn-primary {
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .modal-btn-primary:hover {
+        background: var(--primary-dark);
+      }
+
+      .modal-btn-secondary {
+        background: white;
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+      }
+
+      .modal-btn-secondary:hover {
+        background: #f8fafc;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .modal-content {
+          max-width: 95%;
+          max-height: 95%;
+        }
+
+        .modal-header {
+          padding: 12px 16px;
+        }
+
+        .modal-title {
+          font-size: 16px;
+        }
+
+        .modal-image-container {
+          padding: 16px;
+          min-height: 300px;
+        }
+
+        .modal-image {
+          max-height: 60vh;
+        }
+
+        .modal-footer {
+          padding: 12px 16px;
+          flex-direction: column;
+          gap: 12px;
+          align-items: stretch;
+        }
+
+        .modal-actions {
+          justify-content: center;
+        }
+      }
+
+      /* Notification System */
+      .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1100;
+        min-width: 300px;
+        max-width: 500px;
+        padding: 16px;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+          0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        animation: slideInRight 0.3s ease;
+      }
+
+      .notification-info {
+        background: #f0f9ff;
+        border-left: 4px solid var(--accent-color);
+        color: var(--text-primary);
+      }
+
+      .notification-success {
+        background: #f0fdf4;
+        border-left: 4px solid var(--success-color);
+        color: var(--text-primary);
+      }
+
+      .notification-warning {
+        background: #fffbeb;
+        border-left: 4px solid var(--warning-color);
+        color: var(--text-primary);
+      }
+
+      .notification-error {
+        background: #fef2f2;
+        border-left: 4px solid var(--error-color);
+        color: var(--text-primary);
+      }
+
+      .notification-content {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+      }
+
+      .notification-content i {
+        font-size: 18px;
+      }
+
+      .notification-info .notification-content i {
+        color: var(--accent-color);
+      }
+
+      .notification-success .notification-content i {
+        color: var(--success-color);
+      }
+
+      .notification-warning .notification-content i {
+        color: var(--warning-color);
+      }
+
+      .notification-error .notification-content i {
+        color: var(--error-color);
+      }
+
+      .notification-close {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        color: var(--text-secondary);
+        transition: background-color 0.2s;
+      }
+
+      .notification-close:hover {
+        background-color: rgba(0, 0, 0, 0.1);
+      }
+
+      @keyframes slideInRight {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .notification {
+          top: 10px;
+          right: 10px;
+          left: 10px;
+          min-width: auto;
+          max-width: none;
+        }
+      }
     </style>
   </head>
 
@@ -1177,13 +1451,35 @@
                   <span>Image URL</span>
                   <span class="optional">Required</span>
                 </div>
-                <input
-                  type="text"
-                  id="imageUrl"
-                  class="input-field"
-                  placeholder="https://example.com/passport-image.jpg"
-                  value=""
-                />
+                <div style="display: flex; gap: 8px">
+                  <input
+                    type="text"
+                    id="imageUrl"
+                    class="input-field"
+                    placeholder="https://example.com/passport-image.jpg"
+                    value=""
+                    style="flex: 1"
+                  />
+                  <button
+                    type="button"
+                    onclick="previewImage()"
+                    style="
+                      padding: 14px 16px;
+                      background: var(--primary-color);
+                      color: white;
+                      border: none;
+                      border-radius: var(--radius);
+                      cursor: pointer;
+                      font-size: 14px;
+                      transition: all 0.2s;
+                    "
+                    onmouseover="this.style.background='var(--primary-dark)'"
+                    onmouseout="this.style.background='var(--primary-color)'"
+                    title="Preview Image"
+                  >
+                    <i class="fas fa-eye"></i>
+                  </button>
+                </div>
                 <div
                   style="
                     font-size: 12px;
@@ -1191,7 +1487,8 @@
                     margin-top: 6px;
                   "
                 >
-                  Provide a direct URL to the passport image
+                  Provide a direct URL to the passport image • Click the eye
+                  icon to preview
                 </div>
               </div>
 
@@ -1280,6 +1577,22 @@
                         style="font-size: 12px; color: var(--text-secondary)"
                       ></div>
                     </div>
+                    <button
+                      onclick="previewImage()"
+                      style="
+                        padding: 6px 12px;
+                        background: var(--primary-color);
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 12px;
+                        margin-right: 8px;
+                      "
+                      title="Preview Image"
+                    >
+                      <i class="fas fa-eye"></i>
+                    </button>
                     <button
                       onclick="clearFile()"
                       style="
@@ -1548,6 +1861,45 @@
       </div>
     </div>
 
+    <!-- Image Preview Modal -->
+    <div id="imageModal" class="image-modal" onclick="closeImageModal(event)">
+      <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fas fa-image"></i>
+            <span id="modalImageTitle">Image Preview</span>
+          </div>
+          <button class="modal-close" onclick="closeImageModal()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-image-container">
+          <img id="modalImage" class="modal-image" src="" alt="Preview" />
+        </div>
+        <div class="modal-footer">
+          <div class="modal-info">
+            <span id="modalImageInfo"
+              >Click and drag to move • Scroll to zoom</span
+            >
+          </div>
+          <div class="modal-actions">
+            <button
+              class="modal-btn modal-btn-secondary"
+              onclick="downloadImage()"
+            >
+              <i class="fas fa-download"></i> Download
+            </button>
+            <button
+              class="modal-btn modal-btn-primary"
+              onclick="closeImageModal()"
+            >
+              <i class="fas fa-check"></i> Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script>
       // Global variable to store base64 image
       let selectedImageBase64 = null;
@@ -1582,14 +1934,20 @@
         const isPDF = file.type === "application/pdf";
 
         if (!isImage && !isPDF) {
-          alert("Please select an image file (JPG, PNG, JPEG) or PDF document");
+          showNotification(
+            "Please select an image file (JPG, PNG, JPEG) or PDF document",
+            "error"
+          );
           return;
         }
 
         // Check file size (max 15MB for PDFs, 10MB for images)
         const maxSize = isPDF ? 15 * 1024 * 1024 : 10 * 1024 * 1024;
         if (file.size > maxSize) {
-          alert(`File size must be less than ${isPDF ? "15MB" : "10MB"}`);
+          showNotification(
+            `File size must be less than ${isPDF ? "15MB" : "10MB"}`,
+            "error"
+          );
           return;
         }
 
@@ -1623,6 +1981,12 @@
             console.log(
               "PDF detected - will be converted to image automatically"
             );
+            showNotification(
+              "PDF file selected - will be converted to image during processing",
+              "info"
+            );
+          } else {
+            showNotification("Image file loaded successfully", "success");
           }
         };
         reader.readAsDataURL(file);
@@ -2198,6 +2562,128 @@
         document.getElementById("imageUrl").focus();
       }
 
+      // Image Preview Functions
+      function previewImage() {
+        const inputMethod = document.querySelector(
+          'input[name="inputMethod"]:checked'
+        ).value;
+
+        if (inputMethod === "url") {
+          const imageUrl = document.getElementById("imageUrl").value.trim();
+          if (!imageUrl) {
+            showNotification("Please enter an image URL first", "error");
+            return;
+          }
+          showImageModal(imageUrl, "URL Image Preview");
+        } else {
+          // File upload mode
+          if (!selectedImageBase64) {
+            showNotification("Please select an image file first", "error");
+            return;
+          }
+
+          const fileName = document.getElementById("fileName").textContent;
+          const fileSize = document.getElementById("fileSize").textContent;
+
+          // Check if it's a PDF
+          if (fileSize.includes("PDF")) {
+            showNotification(
+              "PDF preview is not supported. The PDF will be converted to image during processing.",
+              "warning"
+            );
+            return;
+          }
+
+          // Create data URL from base64
+          const dataUrl = `data:image/jpeg;base64,${selectedImageBase64}`;
+          showImageModal(dataUrl, fileName);
+        }
+      }
+
+      function showImageModal(imageSrc, title) {
+        const modal = document.getElementById("imageModal");
+        const modalImage = document.getElementById("modalImage");
+        const modalTitle = document.getElementById("modalImageTitle");
+        const modalInfo = document.getElementById("modalImageInfo");
+
+        // Clear any previous event handlers
+        modalImage.onload = null;
+        modalImage.onerror = null;
+
+        modalTitle.textContent = title;
+        modalInfo.textContent = "Loading image...";
+
+        // Set up new event handlers before setting src
+        modalImage.onload = function () {
+          const img = this;
+          modalInfo.textContent = `${img.naturalWidth} × ${img.naturalHeight} pixels • Click outside to close`;
+        };
+
+        modalImage.onerror = function () {
+          modalInfo.textContent = "Failed to load image";
+          showNotification("Failed to load image for preview", "error");
+        };
+
+        // Set image source after handlers are set up
+        modalImage.src = imageSrc;
+
+        // Show modal
+        modal.classList.add("active");
+        document.body.style.overflow = "hidden"; // Prevent background scrolling
+      }
+
+      function closeImageModal(event) {
+        // Only close if clicking the modal background or close button
+        if (
+          event &&
+          event.target !== event.currentTarget &&
+          !event.target.closest(".modal-close")
+        ) {
+          return;
+        }
+
+        const modal = document.getElementById("imageModal");
+        const modalImage = document.getElementById("modalImage");
+
+        modal.classList.remove("active");
+        document.body.style.overflow = ""; // Restore scrolling
+
+        // Remove event handlers and clear image source to free memory
+        setTimeout(() => {
+          modalImage.onload = null;
+          modalImage.onerror = null;
+          modalImage.src = "";
+        }, 300);
+      }
+
+      function downloadImage() {
+        const modalImage = document.getElementById("modalImage");
+        const imageSrc = modalImage.src;
+        const fileName = document.getElementById("modalImageTitle").textContent;
+
+        if (!imageSrc) {
+          showNotification("No image to download", "error");
+          return;
+        }
+
+        // Create download link
+        const link = document.createElement("a");
+        link.href = imageSrc;
+        link.download = fileName.includes(".") ? fileName : `${fileName}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showNotification("Image download started", "success");
+      }
+
+      // Close modal with Escape key
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          closeImageModal();
+        }
+      });
+
       function copyToClipboard(button) {
         // Find the textarea in the same container
         const textarea = button.closest("div").previousElementSibling;
@@ -2239,6 +2725,50 @@
         // Load step configuration on page load
         loadStepConfig();
       });
+
+      // Notification System
+      function showNotification(message, type = "info") {
+        // Remove existing notifications
+        const existingNotifications =
+          document.querySelectorAll(".notification");
+        existingNotifications.forEach((notification) => notification.remove());
+
+        // Create notification element
+        const notification = document.createElement("div");
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+          <div class="notification-content">
+            <i class="fas fa-${getNotificationIcon(type)}"></i>
+            <span>${message}</span>
+          </div>
+          <button class="notification-close" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+          </button>
+        `;
+
+        // Add to page
+        document.body.appendChild(notification);
+
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+          if (notification.parentElement) {
+            notification.remove();
+          }
+        }, 5000);
+      }
+
+      function getNotificationIcon(type) {
+        switch (type) {
+          case "success":
+            return "check-circle";
+          case "error":
+            return "exclamation-circle";
+          case "warning":
+            return "exclamation-triangle";
+          default:
+            return "info-circle";
+        }
+      }
     </script>
   </body>
 </html>
