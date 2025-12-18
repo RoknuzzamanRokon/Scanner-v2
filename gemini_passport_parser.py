@@ -262,7 +262,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
         except Exception as e:
             # If it's an API error, return immediately
             error_msg = str(e)
-            if "AI parser failed:" in error_msg:
+            if "AI parser failed:" in error_msg or "GeminiOCRError" in str(type(e)):
                 print(f"  ✗ {error_msg}")
                 return {
                     "success": False,
@@ -291,7 +291,7 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
         
         # Surname - Universal patterns for all countries
         surname_patterns = [
-            r'(?:Surname|SURNAME|Nom|Apellido|Cognome|Nachname|Фамилия|उपनाम|姓)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|$|جربوعه)',
+            r'(?:Surname|SURNAME)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|$)',
             r'(?:Family Name|FAMILY NAME)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|$)',
             r'(?:Last Name|LAST NAME)[:\.\-/]*\s*([A-Z\s]+?)(?:\n|$)',
             r'Surname\s+([A-Z]+)\s+جربوعه',  # Specific pattern for "Surname JARBOUAA جربوعه"
@@ -358,17 +358,34 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
                 validation_data['country_code'] = clean_country_code(country_match.group(1))
                 break
         
+        # Extract country code from MRZ line first (most reliable)
+        mrz_country_match = re.search(r'P<([A-Z]{3})', full_text)
+        if mrz_country_match:
+            validation_data['country_code'] = mrz_country_match.group(1)
+            print(f"      Found country code from MRZ: {validation_data['country_code']}")
+        
         # Nationality - Universal patterns
         nationality_patterns = [
-            r'(?:Nationality|NATIONALITY|Nationalité|Nacionalidad|Nazionalità|Staatsangehörigkeit|Гражданство|राष्ट्रीयता|国籍)[:\.\-/]*\s*(?:Country Code\s+)?([A-Z]{3,})',
+            r'(?:Nationality|NATIONALITY)[:\.\-/]*\s*([A-Z]{3,})',
             r'(?:Citizen of|CITIZEN OF)[:\.\-/]*\s*([A-Z]{3,})'
         ]
         for pattern in nationality_patterns:
             nationality_match = re.search(pattern, full_text, re.IGNORECASE | re.MULTILINE)
             if nationality_match:
                 nat_value = nationality_match.group(1).upper()
-                # Convert full country names to 3-letter codes if needed
-                validation_data['nationality'] = nat_value[:3] if len(nat_value) > 3 else nat_value
+                # Map common nationality names to country codes
+                nationality_map = {
+                    'PAKISTANI': 'PAK',
+                    'INDIAN': 'IND', 
+                    'AMERICAN': 'USA',
+                    'BRITISH': 'GBR',
+                    'CANADIAN': 'CAN',
+                    'AUSTRALIAN': 'AUS'
+                }
+                validation_data['nationality'] = nationality_map.get(nat_value, nat_value[:3])
+                # If we don't have country_code from MRZ, use nationality
+                if 'country_code' not in validation_data:
+                    validation_data['country_code'] = validation_data['nationality']
                 break
         
         # Date of Birth - Multiple formats for different countries

@@ -34,6 +34,7 @@ class Config:
     
     # Gemini API
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     
     # Tesseract OCR
     TESSERACT_CMD = os.getenv("TESSERACT_CMD", "")
