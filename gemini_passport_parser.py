@@ -497,9 +497,9 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
             print(f"\n  → Reconstructing MRZ from validation data...")
             
             # Build Line 1: P<CCCSSSSSSSSSSSS<<GGGGGGGGGGGGGGGGGGG
-            country = validation_data.get('country_code', 'UNK')  # Use UNK as universal default
-            surname = validation_data.get('surname', 'UNKNOWN')
-            given = validation_data.get('given_names', 'UNKNOWN')
+            country = validation_data.get('country_code', '')  # Use UNK as universal default
+            surname = validation_data.get('surname', '')
+            given = validation_data.get('given_names', '')
             
             # Ensure surname + given fit in line (max 39 chars after P<CCC)
             name_field = f"{surname}<<{given}"

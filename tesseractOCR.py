@@ -7,6 +7,9 @@ import numpy as np
 import re
 import tempfile
 import os
+import signal
+import subprocess
+import psutil
 from PIL import Image
 from typing import Dict, Optional, Tuple
 import pytesseract
@@ -21,6 +24,42 @@ _country_info_cache = {}
 
 # Cache for image analysis results to avoid redundant calculations
 _image_analysis_cache = {}
+
+def cleanup_tesseract_processes():
+    """Clean up any stuck Tesseract processes"""
+    try:
+        for proc in psutil.process_iter(['pid', 'name', 'create_time']):
+            try:
+                if 'tesseract' in proc.info['name'].lower():
+                    # Kill processes older than 30 seconds
+                    if psutil.time.time() - proc.info['create_time'] > 30:
+                        proc.kill()
+                        print(f"  → Killed stuck Tesseract process (PID: {proc.info['pid']})")
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except Exception as e:
+        print(f"  → Warning: Could not cleanup Tesseract processes: {e}")
+
+def run_tesseract_with_timeout(image, config, timeout=10):
+    """Run Tesseract with timeout and process cleanup"""
+    try:
+        # Try to use server-safe version if available
+        try:
+            from server_config import server_safe_tesseract
+            return server_safe_tesseract(image, config, timeout)
+        except ImportError:
+            # Fallback to regular version with cleanup
+            cleanup_tesseract_processes()
+            result = pytesseract.image_to_string(image, config=config, timeout=timeout)
+            return result
+    except pytesseract.TesseractError as e:
+        if "timeout" in str(e).lower():
+            print(f"    → Tesseract timeout after {timeout}s")
+            cleanup_tesseract_processes()
+        raise e
+    except Exception as e:
+        cleanup_tesseract_processes()
+        raise e
 
 def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool = True, user_id: str = None, previous_passport_validation: bool = False) -> Dict:
     """
@@ -43,6 +82,9 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
     try:
         if verbose:
             print(f"  -> Processing with Super Optimized Tesseract OCR...")
+        
+        # Clean up any stuck Tesseract processes before starting
+        cleanup_tesseract_processes()
         
         # Set Tesseract path from environment (cached)
         from config import config
@@ -417,7 +459,7 @@ def multi_stage_ocr_attempts(processed_images: list, ocr_configs: list, original
                 def run_ocr():
                     nonlocal extracted_text, ocr_exception
                     try:
-                        extracted_text = pytesseract.image_to_string(processed_img, config=config)
+                        extracted_text = run_tesseract_with_timeout(processed_img, config, timeout=5)
                     except Exception as e:
                         ocr_exception = e
                 
@@ -477,7 +519,7 @@ def multi_stage_ocr_attempts(processed_images: list, ocr_configs: list, original
         # Try image sharpening
         try:
             sharpened = apply_image_sharpening(original_img)
-            enhanced_text = pytesseract.image_to_string(sharpened, config='--psm 6')
+            enhanced_text = run_tesseract_with_timeout(sharpened, '--psm 6', timeout=5)
             if enhanced_text and len(enhanced_text.strip()) > 15:
                 enhanced_quality = enhanced_evaluate_ocr_quality(enhanced_text, verbose=False)
                 if enhanced_quality > best_confidence:
@@ -491,7 +533,7 @@ def multi_stage_ocr_attempts(processed_images: list, ocr_configs: list, original
         # Try contrast enhancement
         try:
             contrasted = apply_contrast_enhancement(original_img)
-            contrasted_text = pytesseract.image_to_string(contrasted, config='--psm 6')
+            contrasted_text = run_tesseract_with_timeout(contrasted, '--psm 6', timeout=5)
             if contrasted_text and len(contrasted_text.strip()) > 15:
                 contrasted_quality = enhanced_evaluate_ocr_quality(contrasted_text, verbose=False)
                 if contrasted_quality > best_confidence:
@@ -518,7 +560,7 @@ def multi_stage_ocr_attempts(processed_images: list, ocr_configs: list, original
         
         for config in fallback_configs:
             try:
-                fallback_text = pytesseract.image_to_string(original_img, config=config)
+                fallback_text = run_tesseract_with_timeout(original_img, config, timeout=5)
                 if fallback_text and len(fallback_text.strip()) > 15:
                     fallback_quality = enhanced_evaluate_ocr_quality(fallback_text, verbose=False)
                     if fallback_quality > best_confidence:
