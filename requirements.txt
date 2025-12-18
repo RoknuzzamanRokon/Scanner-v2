@@ -1,16 +1,40 @@
-fastapi
-fastmrz
-opencv-python
-pillow
-python-multipart
-google-generativeai
-requests
-pydantic
-uvicorn
-mrz
-passporteye
-easyocr
-python-dotenv
-pdf2image
-pypdf
-pytesseract
+# Web Framework and API
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+
+# Image Processing and Computer Vision
+opencv-python>=4.8.0
+pillow>=10.0.0
+numpy>=1.24.0
+
+# OCR Libraries
+easyocr>=1.7.0
+pytesseract>=0.3.10
+fastmrz>=1.0.0
+passporteye>=2.2.0
+mrz>=0.6.0
+
+# PDF Processing
+pdf2image>=1.16.0
+pypdf>=3.0.0
+
+# AI and Machine Learning
+google-generativeai>=0.3.0
+
+# Utilities
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# System Dependencies (Linux/Ubuntu)
+# For Tesseract OCR:
+# sudo apt-get update
+# sudo apt-get install tesseract-ocr tesseract-ocr-eng
+# sudo apt-get install libtesseract-dev
+
+# For PDF processing:
+# sudo apt-get install poppler-utils
+
+# For OpenCV:
+# sudo apt-get install libgl1-mesa-glx libglib2.0-0
