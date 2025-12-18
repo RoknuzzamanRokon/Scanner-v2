@@ -107,6 +107,16 @@ def gemini_ocr(image_input, is_url: bool = True, user_id: str = None) -> Dict:
             image = image_input
             print(f"  ✓ Using provided image: {image.size} {image.mode}")
             
+            # Early check for invalid/small images
+            if image.size[0] < 300 or image.size[1] < 300:
+                print(f"  → Invalid Image. Give Valid image.")
+                return {
+                    "success": False,
+                    "passport_data": {},
+                    "mrz_text": "",
+                    "error": "Invalid Image. Give Valid image."
+                }
+            
             # Convert RGBA to RGB if needed
             if image.mode in ('RGBA', 'LA', 'P'):
                 rgb_image = Image.new('RGB', image.size, (255, 255, 255))
@@ -208,6 +218,16 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
             image = rgb_image
             print(f"  ✓ Image converted to RGB")
         
+        # Quick image quality check - if image is too small or low quality, skip API call
+        if image.size[0] < 200 or image.size[1] < 200:
+            print(f"  → Invalid Image. Give Valid image.")
+            return {
+                "success": False,
+                "passport_data": {},
+                "mrz_text": "",
+                "error": "Invalid Image. Give Valid image."
+            }
+        
         # AI Step 1: Extract full text and reconstruct
         print(f"  → AI Step 1: Full Text extraction and data reconstruction...")
         mrz_text = ""  # Initialize mrz_text
@@ -218,6 +238,27 @@ def gemini_ocr_from_url(image_url: str) -> Dict:
             print(f"     {'-'*50}")
             print(full_text)
             print(f"     {'-'*50}")
+            
+            # Check for invalid image responses
+            invalid_responses = [
+                "I'm sorry, but I can't perform that action",
+                "doesn't contain any passport data",
+                "unable to extract information",
+                "I cannot see any passport",
+                "no passport visible",
+                "image doesn't show a passport",
+                "cannot identify passport information"
+            ]
+            
+            if any(phrase.lower() in full_text.lower() for phrase in invalid_responses):
+                print(f"  → Invalid Image. Give Valid image.")
+                return {
+                    "success": False,
+                    "passport_data": {},
+                    "mrz_text": "",
+                    "error": "Invalid Image. Give Valid image."
+                }
+                
         except Exception as e:
             # If it's an API error, return immediately
             error_msg = str(e)

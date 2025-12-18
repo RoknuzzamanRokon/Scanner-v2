@@ -107,6 +107,27 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         if verbose:
             print(f"  -> Passport indicators found: {passport_score}/14")
         
+        # Check for passport validation indicators
+        passport_keywords = ["passport", "pasport", "p<"]
+        angle_bracket_count = all_text.lower().count("<<<")
+        
+        has_passport_keyword = any(keyword in all_text.lower() for keyword in passport_keywords)
+        has_enough_brackets = angle_bracket_count >= 3
+        
+        if has_passport_keyword or has_enough_brackets:
+            if verbose:
+                print(f"  ✓ Valid for passport image.")
+        else:
+            if verbose:
+                print(f"  ✗ Not Valid for Passport")
+            return {
+                "success": False,
+                "passport_data": {},
+                "mrz_text": "",
+                "method_used": "TesseractOCR",
+                "error": "Not Valid for Passport"
+            }
+        
         if passport_score < 3:  # Lower threshold for initial check
             if verbose:
                 print(f"  X No passport indicators found in text")
@@ -385,17 +406,37 @@ def multi_stage_ocr_attempts(processed_images: list, ocr_configs: list, original
                     break
                 
                 import time
+                import threading
                 start_time = time.time()
                 
-                # No timeout - let OCR run to completion
-                try:
-                    extracted_text = pytesseract.image_to_string(processed_img, config=config)
-                except Exception as e:
-                    if verbose:
-                        print(f"      X OCR variant {i+1}.{j+1} failed: {e}")
-                    continue
+                # Add timeout mechanism (3 seconds max)
+                extracted_text = None
+                ocr_exception = None
+                
+                def run_ocr():
+                    nonlocal extracted_text, ocr_exception
+                    try:
+                        extracted_text = pytesseract.image_to_string(processed_img, config=config)
+                    except Exception as e:
+                        ocr_exception = e
+                
+                # Run OCR in a separate thread with timeout
+                ocr_thread = threading.Thread(target=run_ocr)
+                ocr_thread.daemon = True
+                ocr_thread.start()
+                ocr_thread.join(timeout=3.0)  # 3 second timeout
                 
                 processing_time = time.time() - start_time
+                
+                if ocr_thread.is_alive():
+                    if verbose:
+                        print(f"      >> Took max 3 s otherwise it skipping")
+                    continue
+                
+                if ocr_exception:
+                    if verbose:
+                        print(f"      X OCR variant {i+1}.{j+1} failed: {ocr_exception}")
+                    continue
                 
                 if verbose:
                     print(f"      >> Took {processing_time:.1f}s")

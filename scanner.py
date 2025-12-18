@@ -457,20 +457,39 @@ def scan_passport(
 
         # STEP 7: AI Parser (Final Fallback) - Only if AI=ON and Step Enabled
         if use_gemini and is_step_enabled("STEP7", step_config_override):
-            print("\n" + "-"*60)
-            print("🤖 STEP 7: AI Parser (Gemini - Final Fallback)")
-            print("-"*60)
-            
-            step_start = time.time()
-            
-            # Use image_url if available, otherwise use PIL Image
-            if image_url:
-                ai_result = gemini_ocr(image_url, is_url=True, user_id=user_id)
+            # Check if Tesseract detected invalid passport image
+            if tesseract_result.get("error") == "Not Valid for Passport":
+                print("\n" + "-"*60)
+                print("🤖 STEP 7: AI Parser (Gemini - Final Fallback)")
+                print("-"*60)
+                print("  → Cannot get valid image. Give valid image.")
+                
+                # Clean up user temp folder
+                if user_folder_path:
+                    from utils import cleanup_user_folder
+                    cleanup_user_folder(user_folder_path)
+                
+                ai_result = {
+                    "success": False,
+                    "error": "Cannot get valid image. Give valid image."
+                }
+                step_timings["step7_ai_parser"] = "0.00s"
+                working_process_step["step7_ai_parser"] = "Skipped (Invalid Image)"
             else:
-                ai_result = gemini_ocr(image, is_url=False, user_id=user_id)
+                print("\n" + "-"*60)
+                print("🤖 STEP 7: AI Parser (Gemini - Final Fallback)")
+                print("-"*60)
+                
+                step_start = time.time()
+                
+                # Use image_url if available, otherwise use PIL Image
+                if image_url:
+                    ai_result = gemini_ocr(image_url, is_url=True, user_id=user_id)
+                else:
+                    ai_result = gemini_ocr(image, is_url=False, user_id=user_id)
             
-            step_timings["step7_ai_parser"] = f"{time.time() - step_start:.2f}s"
-            working_process_step["step7_ai_parser"] = "Gemini AI"
+                step_timings["step7_ai_parser"] = f"{time.time() - step_start:.2f}s"
+                working_process_step["step7_ai_parser"] = "AI"
             
             if ai_result.get("success", False):
                 print("\n✅ SUCCESS via AI Parser")
