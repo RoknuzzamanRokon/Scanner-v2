@@ -81,7 +81,7 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                 "success": False,
                 "passport_data": {},
                 "mrz_text": "",
-                "method_used": "Tesseract_SuperOptimized_Fixed",
+                "method_used": "TesseractOCR",
                 "error": "No meaningful text detected by Tesseract"
             }
         
@@ -94,7 +94,7 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                 "success": False,
                 "passport_data": {},
                 "mrz_text": "",
-                "method_used": "Tesseract_SuperOptimized_Fixed",
+                "method_used": "TesseractOCR",
                 "error": "No meaningful text detected by Tesseract"
             }
         
@@ -114,7 +114,7 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                 "success": False,
                 "passport_data": {},
                 "mrz_text": "",
-                "method_used": "Tesseract_SuperOptimized_Fixed",
+                "method_used": "TesseractOCR",
                 "error": "No passport indicators found in extracted text"
             }
         
@@ -128,7 +128,7 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                 "success": False,
                 "passport_data": {},
                 "mrz_text": "",
-                "method_used": "Tesseract_SuperOptimized_Fixed",
+                "method_used": "TesseractOCR",
                 "error": "Could not extract or reconstruct valid MRZ from text"
             }
         
@@ -158,7 +158,7 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                 "success": False,
                 "passport_data": {},
                 "mrz_text": mrz_text,
-                "method_used": "Tesseract_SuperOptimized_Fixed",
+                "method_used": "TesseractOCR",
                 "error": f"MRZ validation failed: {validation_result.get('reason', 'Low confidence')} (confidence: {confidence*100:.1f}%)"
             }
         
@@ -193,13 +193,13 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
             # Enhanced validation failure handling
             if user_id:
                 from utils import save_validation_failure
-                save_validation_failure(user_id, "Tesseract_SuperOptimized_Fixed", passport_data, validation_check["field_results"], mrz_text, all_text)
+                save_validation_failure(user_id, "TesseractOCR", passport_data, validation_check["field_results"], mrz_text, all_text)
             
             return {
                 "success": False,
                 "passport_data": passport_data,
                 "mrz_text": mrz_text,
-                "method_used": "Tesseract_SuperOptimized_Fixed",
+                "method_used": "TesseractOCR",
                 "error": f"Field validation threshold not met: {validation_check['valid_count']}/8 fields valid",
                 "validation_summary": validation_check
             }
@@ -217,7 +217,7 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
             "success": True,
             "passport_data": passport_data,
             "mrz_text": mrz_text,
-            "method_used": "Tesseract_SuperOptimized_Fixed",
+            "method_used": "TesseractOCR",
             "error": "",
             "validation_summary": validation_check
         }
@@ -232,7 +232,7 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
             "success": False,
             "passport_data": {},
             "mrz_text": "",
-            "method_used": "Tesseract_SuperOptimized_Fixed",
+            "method_used": "TesseractOCR",
             "error": f"Tesseract processing error: {str(e)}"
         }
 
