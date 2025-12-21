@@ -328,6 +328,47 @@ def get_user_id_from_base64(base64_string: str) -> str:
     return f"base64_{timestamp}_{data_hash}"
 
 
+def save_passport_page_crop(image: Image.Image, user_folder: Path = None) -> str:
+    """
+    Save passport page crop as passport_page_crop.jpg
+    
+    Args:
+        image: PIL Image object of the cropped passport page
+        user_folder: Optional user-specific folder path
+        
+    Returns:
+        Path to saved passport_page_crop.jpg file
+    """
+    try:
+        # Determine save path
+        if user_folder:
+            user_path = Path(user_folder)
+            user_path.mkdir(parents=True, exist_ok=True)
+            save_path = user_path / 'passport_page_crop.jpg'
+        else:
+            temp_dir = Path('temp')
+            temp_dir.mkdir(exist_ok=True)
+            save_path = temp_dir / 'passport_page_crop.jpg'
+        
+        # Convert RGBA to RGB if needed (JPEG doesn't support alpha channel)
+        if image.mode in ('RGBA', 'LA', 'P'):
+            rgb_image = Image.new('RGB', image.size, (255, 255, 255))
+            if image.mode == 'P':
+                image = image.convert('RGBA')
+            rgb_image.paste(image, mask=image.split()[-1] if image.mode in ('RGBA', 'LA') else None)
+            image = rgb_image
+        
+        # Save the image
+        image.save(str(save_path), 'JPEG', quality=95)
+        print(f"💾 Saved passport page crop: {save_path}")
+        
+        return str(save_path)
+        
+    except Exception as e:
+        print(f"⚠️ Failed to save passport page crop: {e}")
+        return ""
+
+
 def cleanup_user_folder(user_folder: Path):
     """
     Delete all files in a user's temporary folder and associated validation failure files

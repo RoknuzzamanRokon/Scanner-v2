@@ -11,6 +11,7 @@ from fastMRZ import validate_passport_with_fastmrz_fallback
 from passport_detector import passport_validation_checker
 from gemini_passport_parser import gemini_ocr
 from function_handler_switch import is_step_enabled, print_step_status
+from face_detection import step0_face_detection_and_alignment
 
 
 def scan_passport(
@@ -24,6 +25,7 @@ def scan_passport(
     Scan passport image and extract MRZ data using multi-layered fallback system
     
     Flow (AI=ON):
+    0. Face Detection & Alignment → Preprocess image
     1. FastMRZ Fallback → Success? Return
     2. PassportEye Fallback → Success? Return
     3. EasyOCR Fallback → Success? Return
@@ -33,6 +35,7 @@ def scan_passport(
     7. All failed → Error
     
     Flow (AI=OFF):
+    0. Face Detection & Alignment → Preprocess image
     1. FastMRZ Fallback → Success? Return
     2. PassportEye Fallback → Success? Return
     3. EasyOCR Fallback → Success? Return
@@ -56,22 +59,22 @@ def scan_passport(
     try:
         # Step 0: Image Loading & Preprocessing
         print("\n" + "="*60)
-        print("📄 PASSPORT SCANNER - MULTI-LAYERED FALLBACK SYSTEM")
+        print("[PASSPORT SCANNER] - MULTI-LAYERED FALLBACK SYSTEM")
         print("="*60)
-        print(f"🔧 AI Mode: {'ON' if use_gemini else 'OFF'}")
+        print(f"[AI MODE]: {'ON' if use_gemini else 'OFF'}")
         
         # Show step controller status
         print_step_status()
         
         step_start = time.time()
         if image_url:
-            print(f"\n📥 Loading image from URL...")
+            print(f"\n[DOWNLOAD] Loading image from URL...")
             image = download_image(image_url)
-            print(f"  ✓ Image loaded: {image.size} {image.mode}")
+            print(f"  [SUCCESS] Image loaded: {image.size} {image.mode}")
         elif image_base64:
-            print(f"\n📥 Decoding base64 image...")
+            print(f"\n[DOWNLOAD] Decoding base64 image...")
             image = decode_base64_image(image_base64)
-            print(f"  ✓ Image decoded: {image.size} {image.mode}")
+            print(f"  [SUCCESS] Image decoded: {image.size} {image.mode}")
         else:
             return {
                 "success": False,
@@ -103,11 +106,38 @@ def scan_passport(
             user_folder = str(user_folder_path)
         
         # Initialize result variables to avoid undefined errors
+        face_detection_result = {"error": "Step not executed", "success": False}
         fastmrz_result = {"error": "Step not executed", "success": False}
         passporteye_result = {"error": "Step not executed", "success": False}
         easyocr_result = {"error": "Step not executed", "success": False}
         tesseract_result = {"error": "Step not executed", "success": False}
         ai_result = {"error": "Step not executed", "success": False}
+        
+        # STEP 0: Face Detection & Alignment
+        if is_step_enabled("STEP0", step_config_override):
+            print("\n" + "-"*60)
+            print("[STEP 0] Face Detection & Alignment")
+            print("-"*60)
+            
+            step_start = time.time()
+            face_detection_result = step0_face_detection_and_alignment(image, user_folder=user_folder)
+            step_timings["step0_face_detection"] = f"{time.time() - step_start:.2f}s"
+            working_process_step["step0_face_detection"] = face_detection_result.get("method_used", "Face Detection")
+            
+            if face_detection_result.get("success", False):
+                print("✅ Face detection and alignment completed")
+                # Use the processed image for subsequent steps
+                image = face_detection_result.get("processed_image", image)
+            else:
+                print(f"[WARNING] Face detection failed: {face_detection_result.get('error', 'Unknown error')}")
+                print("  [INFO] Continuing with original image")
+        else:
+            print("\n" + "-"*60)
+            print("⏭ STEP 0: Face Detection & Alignment - SKIPPED (DISABLED)")
+            print("-"*60)
+            face_detection_result = {"error": "Step disabled", "success": False}
+            step_timings["step0_face_detection"] = "0.00s"
+            working_process_step["step0_face_detection"] = "Skipped (Disabled)"
         
         # STEP 1: FastMRZ Fallback Validation
         if is_step_enabled("STEP1", step_config_override):
@@ -576,7 +606,7 @@ def scan_passport(
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"\n❌ CRITICAL ERROR: {e}")
+        print(f"\n[ERROR] CRITICAL ERROR: {e}")
         print(f"Traceback:\n{error_details}")
         
         # Clean up user temp folder on critical error

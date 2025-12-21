@@ -9,7 +9,12 @@ import tempfile
 import os
 import signal
 import subprocess
-import psutil
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("Warning: psutil not available, process cleanup will be limited")
 from PIL import Image
 from typing import Dict, Optional, Tuple
 import pytesseract
@@ -27,6 +32,10 @@ _image_analysis_cache = {}
 
 def cleanup_tesseract_processes():
     """Clean up any stuck Tesseract processes"""
+    if not PSUTIL_AVAILABLE:
+        print("  → Warning: psutil not available, cannot cleanup Tesseract processes")
+        return
+        
     try:
         for proc in psutil.process_iter(['pid', 'name', 'create_time']):
             try:

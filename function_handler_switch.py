@@ -18,6 +18,7 @@ class StepController:
     def __init__(self):
         """Initialize step controller with default settings"""
         self.steps = {
+            "STEP0": True,   # Face Detection & Alignment
             "STEP1": True,   # FastMRZ
             "STEP2": True,   # PassportEye  
             "STEP3": True,   # EasyOCR
@@ -60,12 +61,12 @@ class StepController:
                             if step in self.steps:
                                 if value in ["off", "false", "0", "disabled"]:
                                     self.steps[step] = False
-                                    print(f"🔴 {step} disabled via config file")
+                                    print(f"[RED] {step} disabled via config file")
                                 elif value in ["on", "true", "1", "enabled"]:
                                     self.steps[step] = True
-                                    print(f"🟢 {step} enabled via config file")
+                                    print(f"[GREEN] {step} enabled via config file")
         except Exception as e:
-            print(f"⚠️ Error loading config file: {e}")
+            print(f"[WARNING] Error loading config file: {e}")
     
     def is_enabled(self, step: str) -> bool:
         """
@@ -85,18 +86,18 @@ class StepController:
         step = step.upper()
         if step in self.steps:
             self.steps[step] = True
-            print(f"🟢 {step} enabled")
+            print(f"[GREEN] {step} enabled")
         else:
-            print(f"❌ Unknown step: {step}")
+            print(f"[ERROR] Unknown step: {step}")
     
     def disable_step(self, step: str):
         """Disable a specific step"""
         step = step.upper()
         if step in self.steps:
             self.steps[step] = False
-            print(f"🔴 {step} disabled")
+            print(f"[RED] {step} disabled")
         else:
-            print(f"❌ Unknown step: {step}")
+            print(f"[ERROR] Unknown step: {step}")
     
     def get_status(self) -> Dict[str, bool]:
         """Get current status of all steps"""
@@ -105,10 +106,11 @@ class StepController:
     def print_status(self):
         """Print current status of all steps"""
         print("\n" + "="*50)
-        print("📊 STEP CONTROLLER STATUS")
+        print("[STEP CONTROLLER STATUS]")
         print("="*50)
         
         step_names = {
+            "STEP0": "Face Detection & Alignment",
             "STEP1": "FastMRZ Fallback",
             "STEP2": "PassportEye Fallback", 
             "STEP3": "EasyOCR Fallback",
@@ -119,7 +121,7 @@ class StepController:
         }
         
         for step, enabled in self.steps.items():
-            status = "🟢 ENABLED " if enabled else "🔴 DISABLED"
+            status = "[ENABLED]" if enabled else "[DISABLED]"
             name = step_names.get(step, "Unknown Step")
             print(f"{step}: {status} - {name}")
         
@@ -131,6 +133,7 @@ class StepController:
             with open("step_config.txt", 'w') as f:
                 f.write("# Step Controller Configuration\n")
                 f.write("# Set to 'on' or 'off' to enable/disable steps\n")
+                f.write("# STEP0 = Face Detection & Alignment\n")
                 f.write("# STEP1 = FastMRZ Fallback\n")
                 f.write("# STEP2 = PassportEye Fallback\n")
                 f.write("# STEP3 = EasyOCR Fallback\n")
@@ -143,9 +146,9 @@ class StepController:
                     value = "on" if enabled else "off"
                     f.write(f"{step}={value}\n")
             
-            print("✅ Configuration saved to step_config.txt")
+            print("[SUCCESS] Configuration saved to step_config.txt")
         except Exception as e:
-            print(f"❌ Error saving config: {e}")
+            print(f"[ERROR] Error saving config: {e}")
 
 
 # Global step controller instance
