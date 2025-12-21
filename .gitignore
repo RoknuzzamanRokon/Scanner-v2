@@ -9,3 +9,5 @@ test/
 .venv/
 
 .hypothesis
+
+__pycache__
