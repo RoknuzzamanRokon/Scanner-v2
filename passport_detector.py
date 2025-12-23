@@ -421,9 +421,9 @@ def estimate_passport_page_boundaries(gray_image: np.ndarray, photo_region: Opti
         mrz_x, mrz_y, mrz_w, mrz_h = mrz_region
         
         # Passport page typically extends beyond both regions
-        page_left = max(0, min(photo_x, mrz_x) - 20)
-        page_top = max(0, photo_y - 30)
-        page_right = min(width, max(photo_x + photo_w, mrz_x + mrz_w) + 20)
+        page_left = 0  # Use full width - start from left edge
+        page_top = max(0, photo_y - photo_h)  # Extend top by full photo height (increased from 30px)
+        page_right = width  # Use full width - extend to right edge
         page_bottom = min(height, mrz_y + mrz_h + 20)
         
         page_w = page_right - page_left
@@ -436,10 +436,11 @@ def estimate_passport_page_boundaries(gray_image: np.ndarray, photo_region: Opti
         photo_x, photo_y, photo_w, photo_h = photo_region
         
         # Estimate based on typical passport proportions
-        page_left = max(0, photo_x - 30)
-        page_top = max(0, photo_y - 20)
-        page_right = min(width, photo_x + photo_w * 3)  # Passport is wider than photo
-        page_bottom = min(height, photo_y + photo_h * 4)  # Passport is taller than photo
+        page_left = 0  # Use full width - start from left edge
+        page_top = max(0, photo_y - photo_h)  # Extend top by full photo height (increased from 20px)
+        page_right = width  # Use full width - extend to right edge
+        # Changed: Instead of going to bottom, stop at 20% above bottom (80% of image height)
+        page_bottom = min(height, int(height * 0.8))  # Stop at 80% of image height (20% above bottom)
         
         page_w = page_right - page_left
         page_h = page_bottom - page_top
@@ -463,6 +464,160 @@ def estimate_passport_page_boundaries(gray_image: np.ndarray, photo_region: Opti
     
     # Fallback: return full image
     return (0, 0, width, height)
+
+
+def save_crop_debug_images(image: Image.Image, regions: Dict, user_folder: str = None) -> None:
+    """
+    Save debug images showing crop areas before actual cropping
+    
+    Args:
+        image: Original PIL Image
+        regions: Dictionary of detected regions
+        user_folder: User folder for saving debug images
+    """
+    try:
+        import cv2
+        import numpy as np
+        from pathlib import Path
+        from datetime import datetime
+        
+        # Create debug folder
+        if user_folder:
+            debug_folder = Path(user_folder) / "crop_debug"
+        else:
+            debug_folder = Path("temp") / "crop_debug"
+        
+        debug_folder.mkdir(parents=True, exist_ok=True)
+        
+        # Convert PIL to OpenCV format
+        img_array = np.array(image)
+        if len(img_array.shape) == 2:
+            debug_img = cv2.cvtColor(img_array, cv2.COLOR_GRAY2BGR)
+        else:
+            debug_img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        
+        # Create overlay image for transparency effects
+        overlay = debug_img.copy()
+        
+        # Color scheme for different crop areas
+        colors = {
+            'photo': (0, 0, 255),           # Red
+            'mrz_search_zone': (255, 255, 0),  # Cyan
+            'mrz_line1': (255, 0, 255),    # Magenta
+            'mrz_line2': (255, 0, 255),    # Magenta
+            'passport_page': (0, 255, 0)   # Green
+        }
+        
+        labels = {
+            'photo': 'PHOTO CROP AREA',
+            'mrz_search_zone': 'MRZ SEARCH ZONE',
+            'mrz_line1': 'MRZ LINE 1',
+            'mrz_line2': 'MRZ LINE 2',
+            'passport_page': 'PASSPORT PAGE CROP'
+        }
+        
+        # Draw crop areas with different visualization styles
+        for region_name, region_coords in regions.items():
+            if region_coords:
+                x, y, w, h = region_coords
+                color = colors.get(region_name, (128, 128, 128))
+                label = labels.get(region_name, region_name)
+                
+                # Draw filled rectangle with transparency for crop area
+                cv2.rectangle(overlay, (x, y), (x + w, y + h), color, -1)
+                
+                # Draw border
+                cv2.rectangle(debug_img, (x, y), (x + w, y + h), color, 3)
+                
+                # Add label with background
+                label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+                cv2.rectangle(debug_img, (x, y - 30), (x + label_size[0] + 10, y), color, -1)
+                cv2.putText(debug_img, label, (x + 5, y - 10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                
+                # Add coordinates text
+                coord_text = f"({x},{y}) {w}x{h}"
+                cv2.putText(debug_img, coord_text, (x + 5, y + h - 10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+        
+        # Blend overlay with original for transparency effect
+        alpha = 0.3  # Transparency level
+        blended = cv2.addWeighted(debug_img, 1 - alpha, overlay, alpha, 0)
+        
+        # Save different debug views
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # 1. Original image with crop areas outlined
+        outline_path = debug_folder / f"crop_areas_outline_{timestamp}.jpg"
+        cv2.imwrite(str(outline_path), debug_img)
+        print(f"  💾 Saved crop areas outline: {outline_path}")
+        
+        # 2. Original image with transparent crop areas
+        transparent_path = debug_folder / f"crop_areas_transparent_{timestamp}.jpg"
+        cv2.imwrite(str(transparent_path), blended)
+        print(f"  💾 Saved transparent crop areas: {transparent_path}")
+        
+        # 3. Individual crop previews
+        for region_name, region_coords in regions.items():
+            if region_coords and region_name in ['photo', 'mrz_search_zone', 'passport_page']:
+                x, y, w, h = region_coords
+                
+                # Ensure coordinates are valid
+                x = max(0, min(x, img_array.shape[1] - 1))
+                y = max(0, min(y, img_array.shape[0] - 1))
+                w = min(w, img_array.shape[1] - x)
+                h = min(h, img_array.shape[0] - y)
+                
+                if w > 0 and h > 0:
+                    # Crop the region
+                    cropped = img_array[y:y+h, x:x+w]
+                    
+                    if cropped.size > 0:
+                        # Save individual crop preview
+                        crop_path = debug_folder / f"crop_preview_{region_name}_{timestamp}.jpg"
+                        
+                        # Convert RGB to BGR for OpenCV saving
+                        if len(cropped.shape) == 3:
+                            cropped_bgr = cv2.cvtColor(cropped, cv2.COLOR_RGB2BGR)
+                        else:
+                            cropped_bgr = cropped
+                        
+                        cv2.imwrite(str(crop_path), cropped_bgr)
+                        print(f"  💾 Saved {region_name} crop preview: {crop_path}")
+        
+        # 4. Create summary image with all information
+        summary_img = debug_img.copy()
+        
+        # Add title
+        cv2.putText(summary_img, "PASSPORT CROP AREAS DEBUG", (10, 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+        
+        # Add legend
+        legend_y = 60
+        for region_name, region_coords in regions.items():
+            if region_coords:
+                color = colors.get(region_name, (128, 128, 128))
+                label = labels.get(region_name, region_name)
+                x, y, w, h = region_coords
+                
+                # Draw color box
+                cv2.rectangle(summary_img, (10, legend_y), (30, legend_y + 20), color, -1)
+                
+                # Add text
+                legend_text = f"{label}: ({x},{y}) {w}x{h}px"
+                cv2.putText(summary_img, legend_text, (40, legend_y + 15), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                
+                legend_y += 30
+        
+        summary_path = debug_folder / f"crop_summary_{timestamp}.jpg"
+        cv2.imwrite(str(summary_path), summary_img)
+        print(f"  💾 Saved crop summary: {summary_path}")
+        
+        print(f"  📁 All debug images saved to: {debug_folder}")
+        
+    except Exception as e:
+        print(f"  ⚠️ Failed to save crop debug images: {e}")
 
 
 def save_region_debug_image(image: Image.Image, regions: Dict, save_path: str) -> None:

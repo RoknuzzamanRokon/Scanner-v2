@@ -127,10 +127,15 @@ def scan_passport(
             if face_detection_result.get("success", False):
                 print("✅ Face detection and alignment completed")
                 # Use the processed image for subsequent steps
+                original_size = f"{image.size[0]}x{image.size[1]}"
+                processed_size = f"{face_detection_result.get('processed_image', image).size[0]}x{face_detection_result.get('processed_image', image).size[1]}"
                 image = face_detection_result.get("processed_image", image)
+                print(f"  Image passed to next step: {original_size} → {processed_size}")
+                print(f"  Debug files available in: {user_folder}")
             else:
                 print(f"[WARNING] Face detection failed: {face_detection_result.get('error', 'Unknown error')}")
                 print("  [INFO] Continuing with original image")
+                print(f"  Using original image: {image.size[0]}x{image.size[1]}")
         else:
             print("\n" + "-"*60)
             print("⏭ STEP 0: Face Detection & Alignment - SKIPPED (DISABLED)")
@@ -144,6 +149,7 @@ def scan_passport(
             print("\n" + "-"*60)
             print("🔍 STEP 1: FastMRZ Fallback Validation")
             print("-"*60)
+            print(f"  Input image size: {image.size[0]}x{image.size[1]}")
             
             step_start = time.time()
             fastmrz_result = validate_passport_with_fastmrz_fallback(image, verbose=True, user_id=user_id)
@@ -192,8 +198,9 @@ def scan_passport(
         # STEP 2: PassportEye Fallback Validation
         if is_step_enabled("STEP2", step_config_override):
             print("\n" + "-"*60)
-            print("🔍 STEP 2: PassportEye Fallback Validation")
+            print("STEP 2: PassportEye Fallback Validation")
             print("-"*60)
+            print(f"  Input image size: {image.size[0]}x{image.size[1]}")
             
             step_start = time.time()
             passporteye_result = validate_passport_with_PassportEye_fallback(image, verbose=True, user_id=user_id)

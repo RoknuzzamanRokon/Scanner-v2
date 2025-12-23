@@ -360,7 +360,7 @@ def save_passport_page_crop(image: Image.Image, user_folder: Path = None) -> str
         
         # Save the image
         image.save(str(save_path), 'JPEG', quality=95)
-        print(f"💾 Saved passport page crop: {save_path}")
+        print(f"Saved passport page crop: {save_path}")
         
         return str(save_path)
         
@@ -377,26 +377,30 @@ def cleanup_user_folder(user_folder: Path):
         user_folder: Path to user's temp folder
     """
     try:
-        if user_folder and user_folder.exists():
-            # Extract user_id from folder name to find associated validation files
-            user_id = user_folder.name
-            
-            # Delete all files in the folder
-            for file in user_folder.glob("*"):
-                if file.is_file():
-                    file.unlink()
-            # Delete the folder itself
-            user_folder.rmdir()
-            print(f"  ✓ Cleaned up user folder: {user_folder.name}")
-            
-            # Also delete associated validation failure JSON files
-            temp_dir = user_folder.parent
-            validation_files = list(temp_dir.glob(f"validation_failures_{user_id}.json"))
-            for validation_file in validation_files:
-                if validation_file.exists():
-                    validation_file.unlink()
-                    print(f"  ✓ Cleaned up validation file: {validation_file.name}")
-        # print(f"  ✓ Cleaned up user folder")
+        # DEBUG MODE: Don't delete files for debugging purposes
+        print(f"  DEBUG MODE: Skipping cleanup of user folder: {user_folder}")
+        print(f"  Files preserved for debugging in: {user_folder}")
+        
+        # In production, you would uncomment the following:
+        # if user_folder and user_folder.exists():
+        #     # Extract user_id from folder name to find associated validation files
+        #     user_id = user_folder.name
+        #     
+        #     # Delete all files in the folder
+        #     for file in user_folder.glob("*"):
+        #         if file.is_file():
+        #             file.unlink()
+        #     # Delete the folder itself
+        #     user_folder.rmdir()
+        #     print(f"  ✓ Cleaned up user folder: {user_folder.name}")
+        #     
+        #     # Also delete associated validation failure JSON files
+        #     temp_dir = user_folder.parent
+        #     validation_files = list(temp_dir.glob(f"validation_failures_{user_id}.json"))
+        #     for validation_file in validation_files:
+        #         if validation_file.exists():
+        #             validation_file.unlink()
+        #             print(f"  ✓ Cleaned up validation file: {validation_file.name}")
     except Exception as e:
         print(f"  ⚠ Failed to cleanup user folder: {e}")
 

@@ -154,19 +154,38 @@ def crop_passport_page(image: Image.Image, face_region: Tuple[int, int, int, int
     img_array = np.array(image)
     height, width = img_array.shape[:2]
     
+    print(f"  Face detection: x={face_x}, y={face_y}, w={face_w}, h={face_h}")
+    print(f"  Image dimensions: {width}x{height}")
+    
     # ICAO standards: passport page is typically 88mm × 125mm
     # Photo is 35mm × 45mm, located in top-left
     # We'll estimate passport page boundaries based on face position
     
     # Estimate passport page boundaries
     # Passport page typically extends beyond the photo
-    page_left = max(0, face_x - face_w)  # Extend left by face width
-    page_top = max(0, face_y - face_h // 2)  # Extend top by half face height
-    page_right = min(width, face_x + face_w * 3)  # Extend right by 3x face width
-    page_bottom = min(height, face_y + face_h * 4)  # Extend bottom by 4x face height
+    page_left = 0  # Use full width - start from left edge
+    page_top = max(0, face_y - face_h * 2)  # Extend top by 2x face height (increased from 0.5x)
+    page_right = width  # Use full width - extend to right edge
+    # Changed: Instead of going to bottom, stop at 20% above bottom (80% of image height)
+    page_bottom = min(height, int(height * 0.8))  # Stop at 80% of image height (20% above bottom)
+    
+    print(f"  Crop region: left={page_left}, top={page_top}, right={page_right}, bottom={page_bottom}")
+    
+    # Validate crop region
+    if page_right <= page_left or page_bottom <= page_top:
+        print("  [WARNING] Invalid crop region, using full image")
+        return image
     
     # Crop passport page
     cropped = img_array[page_top:page_bottom, page_left:page_right]
+    
+    # Validate crop result
+    if cropped.size == 0:
+        print("  [WARNING] Empty crop result, using full image")
+        return image
+    
+    crop_height, crop_width = cropped.shape[:2]
+    print(f"  Crop successful: {crop_width}x{crop_height} pixels")
     
     return Image.fromarray(cropped)
 
@@ -237,9 +256,10 @@ def preprocess_passport_image_with_face_detection(image: Image.Image, debug: boo
                         passport_crop_path = save_passport_page_crop(cropped_image)
                     
                     result["passport_page_crop_path"] = passport_crop_path
+                    print(f"  Cropped image saved: {passport_crop_path}")
                     
                 except Exception as e:
-                    print(f"  ⚠ Failed to save passport_page_crop.jpg: {e}")
+                    print(f"  [WARNING] Failed to save passport_page_crop.jpg: {e}")
             else:
                 result["processed_image"] = aligned_image
                 
@@ -254,9 +274,10 @@ def preprocess_passport_image_with_face_detection(image: Image.Image, debug: boo
                         passport_crop_path = save_passport_page_crop(aligned_image)
                     
                     result["passport_page_crop_path"] = passport_crop_path
+                    print(f"  Original image saved (no face detection): {passport_crop_path}")
                     
                 except Exception as e:
-                    print(f"  ⚠ Failed to save passport_page_crop.jpg: {e}")
+                    print(f"  [WARNING] Failed to save passport_page_crop.jpg: {e}")
                 
             # Save debug images if requested
             if debug and user_folder:
@@ -275,17 +296,38 @@ def preprocess_passport_image_with_face_detection(image: Image.Image, debug: boo
                     else:
                         debug_img = img_array.copy()
                     
-                    # Draw face detection results
+                    # Draw face detection results and crop areas
                     if detection_result["face_region"]:
                         face_x, face_y, face_w, face_h = detection_result["face_region"]
+                        
+                        # Draw face rectangle
                         cv2.rectangle(debug_img, (face_x, face_y), (face_x+face_w, face_y+face_h), (0, 255, 0), 2)
                         cv2.putText(debug_img, "Face", (face_x, face_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        
+                        # Draw crop area if passport page was cropped
+                        if result.get("passport_page_cropped"):
+                            # Calculate crop area based on face position (same logic as crop_passport_page)
+                            page_left = max(0, face_x - face_w)
+                            page_top = max(0, face_y - face_h // 2)
+                            page_right = min(img_array.shape[1], face_x + face_w * 3)
+                            page_bottom = min(img_array.shape[0], face_y + face_h * 4)
+                            
+                            # Draw crop area outline
+                            cv2.rectangle(debug_img, (page_left, page_top), (page_right, page_bottom), (255, 0, 0), 3)
+                            cv2.putText(debug_img, "CROP AREA", (page_left, page_top - 10), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
+                            
+                            # Add crop dimensions
+                            crop_w = page_right - page_left
+                            crop_h = page_bottom - page_top
+                            cv2.putText(debug_img, f"{crop_w}x{crop_h}px", (page_left, page_bottom + 20), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
                     
                     # Save debug image
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    debug_path = debug_folder / f"face_detection_{timestamp}.jpg"
+                    debug_path = debug_folder / f"face_detection_crop_debug_{timestamp}.jpg"
                     cv2.imwrite(str(debug_path), debug_img)
-                    print(f"  → Saved debug image: {debug_path}")
+                    print(f"  → Saved face detection crop debug: {debug_path}")
                     
                 except Exception as e:
                     print(f"  ⚠ Debug image save failed: {e}")
@@ -325,10 +367,10 @@ def preprocess_passport_image_with_face_detection(image: Image.Image, debug: boo
 
 def step0_face_detection_and_alignment(image: Image.Image, user_folder: Optional[str] = None) -> Dict:
     """
-    STEP 0: Face Detection and Alignment
+    STEP 0: Face Detection and Alignment with Comprehensive Crop Debug
     
     This is the first step in the passport processing pipeline.
-    It detects the face, aligns it, and crops the passport page for better OCR accuracy.
+    It detects the face, aligns it, crops the passport page, and creates comprehensive debug images.
     
     Args:
         image: PIL Image object
@@ -338,14 +380,39 @@ def step0_face_detection_and_alignment(image: Image.Image, user_folder: Optional
         Dictionary with step results including processed image
     """
     print("\n" + "-"*60)
-    print("[STEP 0] Face Detection & Alignment")
+    print("[STEP 0] Facial Feature Detection & Image Preprocessing")
     print("-"*60)
     
     step_start = time.time()
     
-    # Perform face detection and alignment
+    # Step 1: Comprehensive region detection and crop debug
+    try:
+        from mrz_detector import detect_and_crop_data_section
+        
+        print("🔍 Running comprehensive region detection with crop debug...")
+        
+        # This will create all the crop debug images
+        cropped_result = detect_and_crop_data_section(
+            image, 
+            save_debug=True, 
+            image_url="step0_processing", 
+            user_folder=user_folder
+        )
+        
+        if cropped_result:
+            print("✓ Region detection and cropping completed")
+            processed_image = cropped_result
+        else:
+            print("⚠ Region detection failed, using original image")
+            processed_image = image
+            
+    except Exception as e:
+        print(f"⚠ Region detection error: {e}")
+        processed_image = image
+    
+    # Step 2: Face detection and alignment
     result = preprocess_passport_image_with_face_detection(
-        image, 
+        processed_image, 
         debug=True, 
         user_folder=user_folder
     )
@@ -353,7 +420,7 @@ def step0_face_detection_and_alignment(image: Image.Image, user_folder: Optional
     step_timing = f"{time.time() - step_start:.2f}s"
     
     if result["success"]:
-        print("[SUCCESS] Face detection and alignment completed successfully")
+        print("✅ Face detection and alignment completed successfully")
         print(f"  → Face detected: {result['face_detected']}")
         print(f"  → Eyes detected: {result['eyes_detected']}")
         print(f"  → Rotation applied: {result['rotation_applied']}")
@@ -367,16 +434,16 @@ def step0_face_detection_and_alignment(image: Image.Image, user_folder: Optional
             "rotation_applied": result["rotation_applied"],
             "passport_page_cropped": result["passport_page_cropped"],
             "step_timing": step_timing,
-            "method_used": "Face Detection & Alignment"
+            "method_used": "Face Detection & Alignment with Crop Debug"
         }
     else:
-        print(f"[WARNING] Face detection failed: {result['error']}")
-        print("  [INFO] Continuing with original image")
+        print(f"⚠ Face detection failed: {result['error']}")
+        print("  → Continuing with processed image from region detection")
         
         return {
-            "success": False,
-            "processed_image": image,  # Return original image
+            "success": True,  # Still successful if we have region detection
+            "processed_image": processed_image,  # Use region-detected image
             "error": result["error"],
             "step_timing": step_timing,
-            "method_used": "Face Detection (Fallback to Original)"
+            "method_used": "Region Detection Only"
         }
