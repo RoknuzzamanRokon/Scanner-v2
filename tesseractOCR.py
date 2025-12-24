@@ -269,13 +269,13 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         if passport_data.get("expiry_date"):
             passport_data["expiry_date"] = enhanced_format_date(passport_data["expiry_date"])
         
-        # Enhanced field validation with more flexible threshold
+        # Enhanced field validation with standard threshold
         from utils import check_field_validation_threshold
-        validation_check = check_field_validation_threshold(mrz_text, threshold=8, verbose=verbose)  # Lower threshold
+        validation_check = check_field_validation_threshold(mrz_text, threshold=10, verbose=verbose)  # Standard threshold
         
         if not validation_check["threshold_met"]:
             if verbose:
-                print(f"!! Field validation threshold not met: {validation_check['valid_count']}/8 fields valid")
+                print(f"!! Field validation threshold not met: {validation_check['valid_count']}/10 fields valid")
                 print(f"   -> Proceeding to next validation method...")
             
             # Enhanced validation failure handling
@@ -288,12 +288,12 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                 "passport_data": passport_data,
                 "mrz_text": mrz_text,
                 "method_used": "TesseractOCR",
-                "error": f"Field validation threshold not met: {validation_check['valid_count']}/8 fields valid",
+                "error": f"Field validation threshold not met: {validation_check['valid_count']}/10 fields valid",
                 "validation_summary": validation_check
             }
         
         if verbose:
-            print(f"OK Field validation threshold met: {validation_check['valid_count']}/8 fields valid")
+            print(f"OK Field validation threshold met: {validation_check['valid_count']}/10 fields valid")
             print(f"   -> Returning validated passport data...")
             print(f"  OK Passport data extracted successfully")
             print(f"    Surname: {passport_data.get('surname', '')}")
