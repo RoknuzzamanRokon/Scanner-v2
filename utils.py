@@ -749,39 +749,39 @@ def cleanup_user_folder(user_folder: Path):
     
     try:
         # # DEBUG MODE: Don't delete files for debugging purposes
-        # print(f"  DEBUG MODE: Skipping cleanup of user folder: {user_folder}")
-        # print(f"  Files preserved for debugging in: {user_folder}")
+        print(f"  DEBUG MODE: Skipping cleanup of user folder: {user_folder}")
+        print(f"  Files preserved for debugging in: {user_folder}")
         
-        # In production, you would uncomment the following:
-        if user_folder and user_folder.exists():
-            # Extract user_id from folder name to find associated validation files
-            user_id = user_folder.name
+        # # In production, you would uncomment the following:
+        # if user_folder and user_folder.exists():
+        #     # Extract user_id from folder name to find associated validation files
+        #     user_id = user_folder.name
             
-            # Use shutil.rmtree for robust directory deletion on Windows
-            # This handles subdirectories, hidden files, and file permissions
-            try:
-                shutil.rmtree(user_folder)
-                print(f"  ✓ Cleaned up user folder: {user_folder.name}")
-            except PermissionError:
-                # If permission error, try to delete files individually first
-                print(f"  ⚠ Permission issue, trying individual file deletion...")
-                cleanup_folder_contents_recursive(user_folder)
-                try:
-                    user_folder.rmdir()
-                    print(f"  ✓ Cleaned up user folder: {user_folder.name}")
-                except Exception as e:
-                    print(f"  ⚠ Could not remove folder {user_folder.name}: {e}")
+        #     # Use shutil.rmtree for robust directory deletion on Windows
+        #     # This handles subdirectories, hidden files, and file permissions
+        #     try:
+        #         shutil.rmtree(user_folder)
+        #         print(f"  ✓ Cleaned up user folder: {user_folder.name}")
+        #     except PermissionError:
+        #         # If permission error, try to delete files individually first
+        #         print(f"  ⚠ Permission issue, trying individual file deletion...")
+        #         cleanup_folder_contents_recursive(user_folder)
+        #         try:
+        #             user_folder.rmdir()
+        #             print(f"  ✓ Cleaned up user folder: {user_folder.name}")
+        #         except Exception as e:
+        #             print(f"  ⚠ Could not remove folder {user_folder.name}: {e}")
             
-            # Also delete associated validation failure JSON files
-            temp_dir = user_folder.parent
-            validation_files = list(temp_dir.glob(f"validation_failures_{user_id}.json"))
-            for validation_file in validation_files:
-                if validation_file.exists():
-                    try:
-                        validation_file.unlink()
-                        print(f"  ✓ Cleaned up validation file: {validation_file.name}")
-                    except Exception as e:
-                        print(f"  ⚠ Could not remove validation file {validation_file.name}: {e}")
+        #     # Also delete associated validation failure JSON files
+        #     temp_dir = user_folder.parent
+        #     validation_files = list(temp_dir.glob(f"validation_failures_{user_id}.json"))
+        #     for validation_file in validation_files:
+        #         if validation_file.exists():
+        #             try:
+        #                 validation_file.unlink()
+        #                 print(f"  ✓ Cleaned up validation file: {validation_file.name}")
+        #             except Exception as e:
+        #                 print(f"  ⚠ Could not remove validation file {validation_file.name}: {e}")
                         
     except Exception as e:
         print(f"  ⚠ Failed to cleanup user folder: {e}")
@@ -793,194 +793,194 @@ def cleanup_user_folder(user_folder: Path):
 
 
 
-def cleanup_folder_contents_recursive(folder_path: Path):
-    """
-    Recursively delete all contents of a folder (Windows-compatible)
+# def cleanup_folder_contents_recursive(folder_path: Path):
+#     """
+#     Recursively delete all contents of a folder (Windows-compatible)
     
-    Args:
-        folder_path: Path to folder to clean
-    """
-    try:
-        if not folder_path.exists():
-            return
+#     Args:
+#         folder_path: Path to folder to clean
+#     """
+#     try:
+#         if not folder_path.exists():
+#             return
             
-        # Delete all files and subdirectories
-        for item in folder_path.iterdir():
-            try:
-                if item.is_file() or item.is_symlink():
-                    # Handle read-only files on Windows
-                    item.chmod(0o777)  # Make writable
-                    item.unlink()
-                elif item.is_dir():
-                    # Recursively delete subdirectory
-                    cleanup_folder_contents_recursive(item)
-                    item.rmdir()
-            except Exception as e:
-                print(f"    ⚠ Could not delete {item.name}: {e}")
+#         # Delete all files and subdirectories
+#         for item in folder_path.iterdir():
+#             try:
+#                 if item.is_file() or item.is_symlink():
+#                     # Handle read-only files on Windows
+#                     item.chmod(0o777)  # Make writable
+#                     item.unlink()
+#                 elif item.is_dir():
+#                     # Recursively delete subdirectory
+#                     cleanup_folder_contents_recursive(item)
+#                     item.rmdir()
+#             except Exception as e:
+#                 print(f"    ⚠ Could not delete {item.name}: {e}")
                 
-    except Exception as e:
-        print(f"  ⚠ Error during recursive cleanup: {e}")
+#     except Exception as e:
+#         print(f"  ⚠ Error during recursive cleanup: {e}")
 
 
 
-def cleanup_json_files_after_success(user_id: str = None, folder_path: str = None):
-    """
-    Clean up JSON files after successful passport data extraction
+# def cleanup_json_files_after_success(user_id: str = None, folder_path: str = None):
+#     """
+#     Clean up JSON files after successful passport data extraction
     
-    Args:
-        user_id: Optional user ID to clean specific user files
-        folder_path: Optional specific folder path to clean
-    """
-    import json
-    from pathlib import Path
+#     Args:
+#         user_id: Optional user ID to clean specific user files
+#         folder_path: Optional specific folder path to clean
+#     """
+#     import json
+#     from pathlib import Path
     
-    try:
-        # Determine which folder to clean
-        if folder_path:
-            cleanup_folder = Path(folder_path)
-        elif user_id:
-            cleanup_folder = config.TEMP_DIR / user_id
-        else:
-            cleanup_folder = config.TEMP_DIR
+#     try:
+#         # Determine which folder to clean
+#         if folder_path:
+#             cleanup_folder = Path(folder_path)
+#         elif user_id:
+#             cleanup_folder = config.TEMP_DIR / user_id
+#         else:
+#             cleanup_folder = config.TEMP_DIR
         
-        if not cleanup_folder.exists():
-            print(f"  ℹ️ Cleanup folder does not exist: {cleanup_folder}")
-            return
+#         if not cleanup_folder.exists():
+#             print(f"  ℹ️ Cleanup folder does not exist: {cleanup_folder}")
+#             return
         
-        # Find and remove JSON files
-        json_files = list(cleanup_folder.glob("*.json"))
+#         # Find and remove JSON files
+#         json_files = list(cleanup_folder.glob("*.json"))
         
-        if json_files:
-            print(f"  🧹 Cleaning up {len(json_files)} JSON files from: {cleanup_folder}")
+#         if json_files:
+#             print(f"  🧹 Cleaning up {len(json_files)} JSON files from: {cleanup_folder}")
             
-            for json_file in json_files:
-                try:
-                    json_file.unlink()
-                    print(f"    ✓ Removed: {json_file.name}")
-                except Exception as e:
-                    print(f"    ❌ Failed to remove {json_file.name}: {e}")
-        else:
-            print(f"  ✅ No JSON files to clean up in: {cleanup_folder}")
+#             for json_file in json_files:
+#                 try:
+#                     json_file.unlink()
+#                     print(f"    ✓ Removed: {json_file.name}")
+#                 except Exception as e:
+#                     print(f"    ❌ Failed to remove {json_file.name}: {e}")
+#         else:
+#             print(f"  ✅ No JSON files to clean up in: {cleanup_folder}")
         
-        # Also clean validation failure files if user_id is provided
-        if user_id:
-            validation_files = list(config.TEMP_DIR.glob(f"validation_failures_{user_id}.json"))
-            for validation_file in validation_files:
-                try:
-                    validation_file.unlink()
-                    print(f"    ✓ Removed validation file: {validation_file.name}")
-                except Exception as e:
-                    print(f"    ❌ Failed to remove validation file: {e}")
+#         # Also clean validation failure files if user_id is provided
+#         if user_id:
+#             validation_files = list(config.TEMP_DIR.glob(f"validation_failures_{user_id}.json"))
+#             for validation_file in validation_files:
+#                 try:
+#                     validation_file.unlink()
+#                     print(f"    ✓ Removed validation file: {validation_file.name}")
+#                 except Exception as e:
+#                     print(f"    ❌ Failed to remove validation file: {e}")
         
-    except Exception as e:
-        print(f"  ⚠️ Error during JSON cleanup: {e}")
+#     except Exception as e:
+#         print(f"  ⚠️ Error during JSON cleanup: {e}")
 
 
-def cleanup_all_temp_json_files():
-    """
-    Clean up all JSON files from the temp directory (global cleanup)
-    """
-    try:
-        temp_dir = config.TEMP_DIR
+# def cleanup_all_temp_json_files():
+#     """
+#     Clean up all JSON files from the temp directory (global cleanup)
+#     """
+#     try:
+#         temp_dir = config.TEMP_DIR
         
-        # Find all JSON files in temp directory and subdirectories
-        json_files = []
-        json_files.extend(temp_dir.glob("*.json"))  # Root level JSON files
+#         # Find all JSON files in temp directory and subdirectories
+#         json_files = []
+#         json_files.extend(temp_dir.glob("*.json"))  # Root level JSON files
         
-        # Also check subdirectories
-        for subfolder in temp_dir.iterdir():
-            if subfolder.is_dir():
-                json_files.extend(subfolder.glob("*.json"))
+#         # Also check subdirectories
+#         for subfolder in temp_dir.iterdir():
+#             if subfolder.is_dir():
+#                 json_files.extend(subfolder.glob("*.json"))
         
-        if json_files:
-            print(f"🧹 Global cleanup: Found {len(json_files)} JSON files to remove")
+#         if json_files:
+#             print(f"🧹 Global cleanup: Found {len(json_files)} JSON files to remove")
             
-            for json_file in json_files:
-                try:
-                    json_file.unlink()
-                    print(f"  ✓ Removed: {json_file.relative_to(temp_dir)}")
-                except Exception as e:
-                    print(f"  ❌ Failed to remove {json_file.name}: {e}")
-        else:
-            print("✅ No JSON files found for cleanup")
+#             for json_file in json_files:
+#                 try:
+#                     json_file.unlink()
+#                     print(f"  ✓ Removed: {json_file.relative_to(temp_dir)}")
+#                 except Exception as e:
+#                     print(f"  ❌ Failed to remove {json_file.name}: {e}")
+#         else:
+#             print("✅ No JSON files found for cleanup")
             
-    except Exception as e:
-        print(f"⚠️ Error during global JSON cleanup: {e}")
+#     except Exception as e:
+#         print(f"⚠️ Error during global JSON cleanup: {e}")
 
 
-def cleanup_user_data_after_success(user_id: str):
-    """
-    Complete cleanup after successful passport data extraction
-    Removes JSON files, validation failures, and optionally temp images
+# def cleanup_user_data_after_success(user_id: str):
+#     """
+#     Complete cleanup after successful passport data extraction
+#     Removes JSON files, validation failures, and optionally temp images
     
-    Args:
-        user_id: User ID for targeted cleanup
-    """
-    try:
-        print(f"🧹 Starting cleanup for user: {user_id}")
+#     Args:
+#         user_id: User ID for targeted cleanup
+#     """
+#     try:
+#         print(f"🧹 Starting cleanup for user: {user_id}")
         
-        # 1. Clean up JSON files in user folder
-        user_folder = config.TEMP_DIR / user_id
-        cleanup_json_files_after_success(user_id=user_id)
+#         # 1. Clean up JSON files in user folder
+#         user_folder = config.TEMP_DIR / user_id
+#         cleanup_json_files_after_success(user_id=user_id)
         
-        # 2. Remove validation failure files
-        remove_validation_failures(user_id)
+#         # 2. Remove validation failure files
+#         remove_validation_failures(user_id)
         
-        # 3. Optionally clean up temp images (uncomment if needed)
-        cleanup_user_folder(user_folder)
+#         # 3. Optionally clean up temp images (uncomment if needed)
+#         cleanup_user_folder(user_folder)
         
-        print(f"✅ Cleanup completed for user: {user_id}")
+#         print(f"✅ Cleanup completed for user: {user_id}")
         
-    except Exception as e:
-        print(f"⚠️ Error during user cleanup: {e}")
+#     except Exception as e:
+#         print(f"⚠️ Error during user cleanup: {e}")
 
 
-def cleanup_temp_files():
-    """
-    Clean up old temporary files, folders, and JSON files
-    Windows-compatible version with robust directory handling
-    """
-    import shutil
+# def cleanup_temp_files():
+#     """
+#     Clean up old temporary files, folders, and JSON files
+#     Windows-compatible version with robust directory handling
+#     """
+#     import shutil
     
-    try:
-        # Clean up old individual files in root temp dir
-        for file in config.TEMP_DIR.glob("*.jpg"):
-            # Delete files older than 1 hour
-            if (datetime.now().timestamp() - file.stat().st_mtime) > 3600:
-                try:
-                    file.unlink()
-                except Exception as e:
-                    print(f"  ⚠ Could not delete {file.name}: {e}")
+#     try:
+#         # Clean up old individual files in root temp dir
+#         for file in config.TEMP_DIR.glob("*.jpg"):
+#             # Delete files older than 1 hour
+#             if (datetime.now().timestamp() - file.stat().st_mtime) > 3600:
+#                 try:
+#                     file.unlink()
+#                 except Exception as e:
+#                     print(f"  ⚠ Could not delete {file.name}: {e}")
         
-        # Clean up old JSON files (older than 1 hour)
-        for file in config.TEMP_DIR.glob("*.json"):
-            if (datetime.now().timestamp() - file.stat().st_mtime) > 3600:
-                try:
-                    file.unlink()
-                    print(f"  ✓ Cleaned up old JSON file: {file.name}")
-                except Exception as e:
-                    print(f"  ⚠ Could not delete JSON file {file.name}: {e}")
+#         # Clean up old JSON files (older than 1 hour)
+#         for file in config.TEMP_DIR.glob("*.json"):
+#             if (datetime.now().timestamp() - file.stat().st_mtime) > 3600:
+#                 try:
+#                     file.unlink()
+#                     print(f"  ✓ Cleaned up old JSON file: {file.name}")
+#                 except Exception as e:
+#                     print(f"  ⚠ Could not delete JSON file {file.name}: {e}")
         
-        # Clean up old validation failure files (older than 2 hours)
-        for file in config.TEMP_DIR.glob("validation_failures_*.json"):
-            if (datetime.now().timestamp() - file.stat().st_mtime) > 7200:  # 2 hours
-                try:
-                    file.unlink()
-                except Exception as e:
-                    print(f"  ⚠ Could not delete validation file {file.name}: {e}")
+#         # Clean up old validation failure files (older than 2 hours)
+#         for file in config.TEMP_DIR.glob("validation_failures_*.json"):
+#             if (datetime.now().timestamp() - file.stat().st_mtime) > 7200:  # 2 hours
+#                 try:
+#                     file.unlink()
+#                 except Exception as e:
+#                     print(f"  ⚠ Could not delete validation file {file.name}: {e}")
         
-        # Clean up old user folders (older than 1 hour) - Windows-compatible
-        for folder in config.TEMP_DIR.iterdir():
-            if folder.is_dir():
-                # Check if folder is older than 1 hour
-                if (datetime.now().timestamp() - folder.stat().st_mtime) > 3600:
-                    try:
-                        # Use shutil.rmtree for robust deletion
-                        shutil.rmtree(folder)
-                        print(f"  ✓ Cleaned up old folder: {folder.name}")
-                    except Exception as e:
-                        print(f"  ⚠ Could not delete folder {folder.name}: {e}")
+#         # Clean up old user folders (older than 1 hour) - Windows-compatible
+#         for folder in config.TEMP_DIR.iterdir():
+#             if folder.is_dir():
+#                 # Check if folder is older than 1 hour
+#                 if (datetime.now().timestamp() - folder.stat().st_mtime) > 3600:
+#                     try:
+#                         # Use shutil.rmtree for robust deletion
+#                         shutil.rmtree(folder)
+#                         print(f"  ✓ Cleaned up old folder: {folder.name}")
+#                     except Exception as e:
+#                         print(f"  ⚠ Could not delete folder {folder.name}: {e}")
                         
-    except Exception as e:
-        print(f"  ⚠ Error during temp files cleanup: {e}")
-        pass  # Continue despite cleanup errors
+#     except Exception as e:
+#         print(f"  ⚠ Error during temp files cleanup: {e}")
+#         pass  # Continue despite cleanup errors
