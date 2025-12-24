@@ -7,6 +7,115 @@ from datetime import datetime
 from typing import Dict, Any
 
 
+def validate_passport_data_fields(passport_data: dict) -> Dict[str, str]:
+    """
+    Validate extracted passport data fields (not MRZ format)
+    
+    Args:
+        passport_data: Dictionary with extracted passport data
+        
+    Returns:
+        Dictionary with validation status for each field
+    """
+    result = {
+        "document_type": "Invalid",
+        "issuing_country": "Invalid", 
+        "surname": "Invalid",
+        "given_names": "Invalid",
+        "passport_number": "Invalid",
+        "nationality": "Invalid",
+        "date_of_birth": "Invalid",
+        "sex": "Invalid",
+        "expiry_date": "Invalid",
+        "personal_number": "Invalid"
+    }
+    
+    try:
+        # Document Type
+        doc_type = passport_data.get("document_type", "")
+        if doc_type and doc_type.upper() in ['P', 'PO', 'PD', 'PN', 'PS']:
+            result["document_type"] = "Valid"
+        
+        # Issuing Country / Country Code
+        country = passport_data.get("country_code", "")
+        if country and len(country) == 3 and re.match(r'^[A-Z]{3}$', country.upper()):
+            result["issuing_country"] = "Valid"
+        
+        # Surname
+        surname = passport_data.get("surname", "")
+        if surname and len(surname.strip()) >= 1:
+            clean_surname = re.sub(r'[^A-Z]', '', surname.upper())
+            if len(clean_surname) >= 1 and not _has_excessive_repeated_chars(clean_surname):
+                result["surname"] = "Valid"
+        
+        # Given Names - ACCEPT EMPTY AS VALID
+        given_names = passport_data.get("given_names", "")
+        if given_names == "" or given_names is None:
+            # Empty given names is VALID for single-name passports
+            result["given_names"] = "Valid"
+        elif given_names and len(given_names.strip()) >= 1:
+            clean_given = re.sub(r'[^A-Z\s]', '', given_names.upper())
+            if len(clean_given.strip()) >= 1 and not _has_excessive_repeated_chars(clean_given.replace(' ', '')):
+                result["given_names"] = "Valid"
+        
+        # Passport Number
+        passport_num = passport_data.get("passport_number", "")
+        if passport_num and len(passport_num.strip()) >= 1:
+            clean_passport = re.sub(r'[^A-Z0-9]', '', passport_num.upper())
+            if len(clean_passport) >= 1:
+                result["passport_number"] = "Valid"
+        
+        # Nationality
+        nationality = passport_data.get("nationality", "") or passport_data.get("country_code", "")
+        if nationality and len(nationality) >= 2:
+            result["nationality"] = "Valid"
+        
+        # Date of Birth
+        dob = passport_data.get("date_of_birth", "")
+        if dob:
+            # Handle different date formats
+            if re.match(r'^\d{4}-\d{2}-\d{2}$', dob):  # YYYY-MM-DD
+                year, month, day = dob.split('-')
+                dob_yymmdd = year[2:] + month + day
+                result["date_of_birth"] = _validate_date_field(dob_yymmdd, "birth")
+            elif re.match(r'^\d{6}$', dob):  # YYMMDD
+                result["date_of_birth"] = _validate_date_field(dob, "birth")
+        
+        # Sex
+        sex = passport_data.get("sex", "")
+        if sex:
+            from sex_field_normalizer import normalize_sex_field
+            normalized_sex = normalize_sex_field(sex)
+            if normalized_sex in ['M', 'F', 'X']:
+                result["sex"] = "Valid"
+        
+        # Expiry Date
+        expiry = passport_data.get("expiry_date", "")
+        if expiry:
+            # Handle different date formats
+            if re.match(r'^\d{4}-\d{2}-\d{2}$', expiry):  # YYYY-MM-DD
+                year, month, day = expiry.split('-')
+                expiry_yymmdd = year[2:] + month + day
+                result["expiry_date"] = _validate_date_field(expiry_yymmdd, "expiry")
+            elif re.match(r'^\d{6}$', expiry):  # YYMMDD
+                result["expiry_date"] = _validate_date_field(expiry, "expiry")
+        
+        # Personal Number (optional field)
+        personal_num = passport_data.get("personal_number", "")
+        if not personal_num or personal_num == "":
+            # Empty personal number is valid (optional field)
+            result["personal_number"] = "Valid"
+        else:
+            clean_personal = re.sub(r'[^A-Z0-9]', '', personal_num.upper())
+            if len(clean_personal) >= 1:
+                result["personal_number"] = "Valid"
+        
+        return result
+        
+    except Exception:
+        return result
+
+
 def validate_passport_fields(mrz_text: str) -> Dict[str, str]:
     """
     Validate each field in TD3 MRZ format individually
@@ -176,7 +285,7 @@ def _validate_name_field(name_field: str) -> tuple:
             if not _has_excessive_repeated_chars(surname_part):
                 surname_status = "Valid"
         
-        # Validate given names
+        # Validate given names - MODIFIED TO ACCEPT EMPTY GIVEN NAMES
         given_names_status = "Invalid"
         if len(given_names_part) >= 1:
             # Remove trailing chevrons and split by single chevrons
@@ -190,8 +299,11 @@ def _validate_name_field(name_field: str) -> tuple:
                         # Check for repeated characters (more than 2 consecutive same characters)
                         if not _has_excessive_repeated_chars(given_names_clean):
                             given_names_status = "Valid"
-        elif len(given_names_part.rstrip('<')) == 0:
-            # Empty given names part (only chevrons) - some passports have only surname
+            else:
+                # Empty given names part (only chevrons) - VALID for single-name passports
+                given_names_status = "Valid"
+        else:
+            # Empty given names part (no chevrons at all) - VALID for single-name passports
             given_names_status = "Valid"
         
         return (surname_status, given_names_status)

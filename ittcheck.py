@@ -316,9 +316,9 @@ def validate_passport_with_ittcheck(image: Image.Image, verbose: bool = True, us
             print(f"    • Passport: {passport_data.get('passport_number', 'N/A')}")
             print(f"    • Sex: {passport_data.get('sex', 'N/A')}")
         
-        # Perform field validation check
-        from utils import check_field_validation_threshold
-        validation_check = check_field_validation_threshold(mrz_text, threshold=10, verbose=verbose)
+        # Perform field validation check using extracted passport data
+        from utils import check_passport_data_validation_threshold
+        validation_check = check_passport_data_validation_threshold(passport_data, threshold=10, verbose=verbose)
         
         if validation_check["threshold_met"]:
             if verbose:
