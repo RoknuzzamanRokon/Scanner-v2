@@ -114,40 +114,77 @@ def smart_rotation_detection(image: Image.Image, verbose: bool = True) -> tuple:
     confidence = 0.0
     rotation_angle = 0
     
-    # Strong evidence for 90° rotation
-    if len(near_vertical) >= 5 and len(near_vertical) > len(near_horizontal) * 2:
+    # For passport/document images, be more conservative about 90° rotations
+    # Passports naturally have many vertical lines (text, borders, fields)
+    
+    # Strong evidence for 90° rotation - much more restrictive criteria
+    if len(near_vertical) >= 10 and len(near_vertical) > len(near_horizontal) * 3 and len(near_horizontal) < 3:
         vertical_median = np.median(near_vertical)
         
-        # Calculate confidence based on line count and consistency
+        # Calculate confidence based on line count and consistency - more conservative
         line_ratio = len(near_vertical) / max(len(near_horizontal), 1)
         angle_consistency = 1.0 - (np.std(near_vertical) / 90.0) if len(near_vertical) > 1 else 1.0
-        confidence = min(0.9, (line_ratio / 10.0) + angle_consistency * 0.5)
         
-        # Determine rotation direction
-        if vertical_median < 0:  # Lines at ~-90°
-            rotation_angle = 90  # Rotate clockwise to make them horizontal
-        else:  # Lines at ~+90°
-            rotation_angle = -90  # Rotate counter-clockwise
-            
-        if verbose:
-            print(f"    → Strong vertical evidence: {len(near_vertical)} lines at {vertical_median:.1f}°")
-            print(f"    → Confidence: {confidence:.2f}, suggested rotation: {rotation_angle}°")
+        # Much more restrictive confidence calculation
+        confidence = min(0.85, (line_ratio / 20.0) + angle_consistency * 0.4)
+        
+        # Additional check: ensure we have overwhelming vertical evidence
+        if line_ratio > 5.0 and angle_consistency > 0.8:
+            # Determine rotation direction
+            if vertical_median < 0:  # Lines at ~-90°
+                rotation_angle = 90  # Rotate clockwise to make them horizontal
+            else:  # Lines at ~+90°
+                rotation_angle = -90  # Rotate counter-clockwise
+                
+            if verbose:
+                print(f"    → Strong vertical evidence: {len(near_vertical)} lines at {vertical_median:.1f}°")
+                print(f"    → Line ratio: {line_ratio:.1f}, consistency: {angle_consistency:.2f}")
+                print(f"    → Confidence: {confidence:.2f}, suggested rotation: {rotation_angle}°")
+        else:
+            # Not confident enough for 90° rotation
+            confidence = 0.5
+            rotation_angle = 0
+            if verbose:
+                print(f"    → Vertical lines detected but not confident enough for 90° rotation")
+                print(f"    → Line ratio: {line_ratio:.1f}, consistency: {angle_consistency:.2f}")
     
-    # Evidence for correct orientation
-    elif len(near_horizontal) >= 3 and len(near_horizontal) >= len(near_vertical):
+    # Evidence for correct orientation - enhanced logic
+    elif len(near_horizontal) >= 3:
         horizontal_median = np.median(near_horizontal)
         
-        # Small skew correction
-        if abs(horizontal_median) > 1.0 and abs(horizontal_median) < 15:
-            rotation_angle = horizontal_median
-            confidence = 0.6
-            if verbose:
-                print(f"    → Small skew correction: {rotation_angle:.1f}°")
+        # Check if we have a good mix of horizontal and vertical lines (normal for documents)
+        if len(near_vertical) > 0 and len(near_horizontal) > 0:
+            h_to_v_ratio = len(near_horizontal) / len(near_vertical)
+            if 0.3 <= h_to_v_ratio <= 3.0:  # Balanced mix suggests proper orientation
+                confidence = 0.9
+                rotation_angle = 0
+                if verbose:
+                    print(f"    → Balanced line distribution suggests correct orientation")
+                    print(f"    → Horizontal: {len(near_horizontal)}, Vertical: {len(near_vertical)}, Ratio: {h_to_v_ratio:.2f}")
+            else:
+                # Small skew correction only
+                if abs(horizontal_median) > 1.0 and abs(horizontal_median) < 10:
+                    rotation_angle = horizontal_median
+                    confidence = 0.6
+                    if verbose:
+                        print(f"    → Small skew correction: {rotation_angle:.1f}°")
+                else:
+                    rotation_angle = 0
+                    confidence = 0.8
+                    if verbose:
+                        print(f"    → Image appears correctly oriented")
         else:
-            rotation_angle = 0
-            confidence = 0.8
-            if verbose:
-                print(f"    → Image appears correctly oriented")
+            # Only horizontal lines detected
+            if abs(horizontal_median) > 1.0 and abs(horizontal_median) < 10:
+                rotation_angle = horizontal_median
+                confidence = 0.6
+                if verbose:
+                    print(f"    → Small skew correction: {rotation_angle:.1f}°")
+            else:
+                rotation_angle = 0
+                confidence = 0.8
+                if verbose:
+                    print(f"    → Image appears correctly oriented")
     
     # Insufficient evidence
     else:
@@ -156,8 +193,10 @@ def smart_rotation_detection(image: Image.Image, verbose: bool = True) -> tuple:
         if verbose:
             print(f"    → Insufficient evidence for rotation")
     
-    # Apply rotation if confident
-    if abs(rotation_angle) > 0.5 and confidence > 0.7:
+    # Apply rotation only if very confident - higher threshold for 90° rotations
+    rotation_threshold = 0.85 if abs(rotation_angle) >= 45 else 0.7
+    
+    if abs(rotation_angle) > 0.5 and confidence >= rotation_threshold:
         (h, w) = img_cv.shape[:2]
         center = (w // 2, h // 2)
         M = cv2.getRotationMatrix2D(center, rotation_angle, 1.0)
@@ -182,6 +221,9 @@ def save_rotation_debug_images(result: dict, user_folder: Optional[str] = None) 
         result: Result dictionary from detect_and_correct_rotation
         user_folder: Optional user folder for saving debug images
     """
+    original_saved = False
+    corrected_saved = False
+    
     try:
         from pathlib import Path
         from datetime import datetime
@@ -197,20 +239,58 @@ def save_rotation_debug_images(result: dict, user_folder: Optional[str] = None) 
         
         debug_folder.mkdir(parents=True, exist_ok=True)
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
         
-        # Save original image
-        original_path = debug_folder / f"original_{timestamp}.jpg"
-        result['original_image'].save(str(original_path), 'JPEG', quality=95)
+        # Always try to save original image first
+        try:
+            original_path = debug_folder / f"original_{timestamp}.jpg"
+            
+            if 'original_image' in result:
+                # Convert RGBA to RGB if necessary (JPEG doesn't support transparency)
+                image_to_save = result['original_image']
+                if image_to_save.mode == 'RGBA':
+                    # Create white background and paste RGBA image on it
+                    rgb_image = Image.new('RGB', image_to_save.size, (255, 255, 255))
+                    rgb_image.paste(image_to_save, mask=image_to_save.split()[-1])  # Use alpha channel as mask
+                    image_to_save = rgb_image
+                elif image_to_save.mode not in ['RGB', 'L']:
+                    # Convert other modes to RGB
+                    image_to_save = image_to_save.convert('RGB')
+                
+                image_to_save.save(str(original_path), 'JPEG', quality=95)
+                original_saved = True
+        except Exception as e:
+            print(f"  ⚠ Failed to save original image: {e}")
         
-        # Save corrected image (if different)
-        if result['rotation_needed']:
-            angle_str = f"{result['rotation_applied']:.1f}".replace('.', '_')
-            corrected_path = debug_folder / f"corrected_{angle_str}deg_{timestamp}.jpg"
-            result['corrected_image'].save(str(corrected_path), 'JPEG', quality=95)
+        # Try to save corrected image (if different)
+        try:
+            if result.get('rotation_needed', False):
+                angle_str = f"{result['rotation_applied']:.1f}".replace('.', '_')
+                corrected_path = debug_folder / f"corrected_{angle_str}deg_{timestamp}.jpg"
+                
+                # Convert RGBA to RGB if necessary (JPEG doesn't support transparency)
+                image_to_save = result['corrected_image']
+                if image_to_save.mode == 'RGBA':
+                    # Create white background and paste RGBA image on it
+                    rgb_image = Image.new('RGB', image_to_save.size, (255, 255, 255))
+                    rgb_image.paste(image_to_save, mask=image_to_save.split()[-1])  # Use alpha channel as mask
+                    image_to_save = rgb_image
+                elif image_to_save.mode not in ['RGB', 'L']:
+                    # Convert other modes to RGB
+                    image_to_save = image_to_save.convert('RGB')
+                
+                image_to_save.save(str(corrected_path), 'JPEG', quality=95)
+                corrected_saved = True
+        except Exception as e:
+            print(f"  ⚠ Failed to save corrected image: {e}")
+        
+        # Final status message
+        if original_saved and corrected_saved:
             print(f"  💾 Saved rotation debug images: {debug_folder}")
+        elif original_saved:
+            print(f"  💾 Saved original image (no rotation needed): {debug_folder}")
         else:
-            print(f"  💾 Saved original image (no rotation needed): {original_path}")
+            print(f"  ⚠ Failed to save rotation debug images")
             
     except Exception as e:
         print(f"  ⚠ Failed to save rotation debug images: {e}")
@@ -267,7 +347,7 @@ def save_line_detection_debug(image: Image.Image, user_folder: Optional[str] = N
         
         debug_folder.mkdir(parents=True, exist_ok=True)
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
         
         # Save edge detection result
         edges_path = debug_folder / f"edges_{timestamp}.jpg"
