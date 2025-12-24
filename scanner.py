@@ -105,6 +105,38 @@ def scan_passport(
             user_folder_path = create_user_temp_folder(user_id)
             user_folder = str(user_folder_path)
         
+        # ROTATION DETECTION: Check and correct image orientation FIRST
+        print("\n" + "-"*60)
+        print("[ROTATION] Hough Line Image Orientation Detection & Correction")
+        print("-"*60)
+        
+        step_start = time.time()
+        from image_rotation_detector import detect_and_correct_rotation, save_rotation_debug_images, save_line_detection_debug
+        
+        rotation_result = detect_and_correct_rotation(image, verbose=True)
+        step_timings["rotation_detection"] = f"{time.time() - step_start:.2f}s"
+        working_process_step["rotation_detection"] = rotation_result.get("method_used", "Hough Line Detection")
+        
+        if rotation_result.get("success", False):
+            if rotation_result.get("rotation_needed", False):
+                print(f"✅ Image rotation corrected: {rotation_result['rotation_applied']:.2f}° using Hough lines")
+                # Use the corrected image for all subsequent processing
+                original_size = f"{image.size[0]}x{image.size[1]}"
+                image = rotation_result["corrected_image"]
+                corrected_size = f"{image.size[0]}x{image.size[1]}"
+                print(f"  Image updated: {original_size} → {corrected_size}")
+            else:
+                print("✅ Image orientation is correct (no rotation needed)")
+            
+            # Save rotation debug images if user folder is available
+            if user_folder:
+                save_rotation_debug_images(rotation_result, user_folder)
+                # Also save line detection debug for analysis
+                save_line_detection_debug(rotation_result["original_image"], user_folder)
+        else:
+            print(f"[WARNING] Rotation detection failed: {rotation_result.get('error', 'Unknown error')}")
+            print("  [INFO] Continuing with original image orientation")
+        
         # Initialize result variables to avoid undefined errors
         face_detection_result = {"error": "Step not executed", "success": False}
         fastmrz_result = {"error": "Step not executed", "success": False}
