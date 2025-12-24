@@ -145,6 +145,9 @@ def scan_passport(
         tesseract_result = {"error": "Step not executed", "success": False}
         ai_result = {"error": "Step not executed", "success": False}
         
+        # Store original image for Step 7 (AI Parser)
+        original_image_for_ai = image
+        
         # STEP 0: Face Detection & Alignment
         if is_step_enabled("STEP0", step_config_override):
             print("\n" + "-"*60)
@@ -176,15 +179,45 @@ def scan_passport(
             step_timings["step0_face_detection"] = "0.00s"
             working_process_step["step0_face_detection"] = "Skipped (Disabled)"
         
+        # Check for imagedata_section_full.jpg and use it for Steps 1-6
+        document_section_image = image  # Default to current processed image
+        if user_folder:
+            from pathlib import Path
+            imagedata_path = Path(user_folder) / 'imagedata_section_full.jpg'
+            if imagedata_path.exists():
+                try:
+                    document_section_image = Image.open(str(imagedata_path))
+                    print(f"\n📄 Using document section image for Steps 1-6: {imagedata_path}")
+                    print(f"  Document section size: {document_section_image.size[0]}x{document_section_image.size[1]}")
+                    print(f"  Original image reserved for Step 7: {original_image_for_ai.size[0]}x{original_image_for_ai.size[1]}")
+                except Exception as e:
+                    print(f"⚠ Failed to load document section image: {e}")
+                    print("  Using processed image for all steps")
+            else:
+                print(f"\n📄 Document section image not found, using processed image for Steps 1-6")
+        else:
+            # Try fallback temp location
+            from pathlib import Path
+            imagedata_path = Path('temp') / 'imagedata_section_full.jpg'
+            if imagedata_path.exists():
+                try:
+                    document_section_image = Image.open(str(imagedata_path))
+                    print(f"\n📄 Using document section image for Steps 1-6: {imagedata_path}")
+                    print(f"  Document section size: {document_section_image.size[0]}x{document_section_image.size[1]}")
+                    print(f"  Original image reserved for Step 7: {original_image_for_ai.size[0]}x{original_image_for_ai.size[1]}")
+                except Exception as e:
+                    print(f"⚠ Failed to load document section image: {e}")
+                    print("  Using processed image for all steps")
+        
         # STEP 1: FastMRZ Fallback Validation
         if is_step_enabled("STEP1", step_config_override):
             print("\n" + "-"*60)
             print("🔍 STEP 1: FastMRZ Fallback Validation")
             print("-"*60)
-            print(f"  Input image size: {image.size[0]}x{image.size[1]}")
+            print(f"  Input image size: {document_section_image.size[0]}x{document_section_image.size[1]}")
             
             step_start = time.time()
-            fastmrz_result = validate_passport_with_fastmrz_fallback(image, verbose=True, user_id=user_id)
+            fastmrz_result = validate_passport_with_fastmrz_fallback(document_section_image, verbose=True, user_id=user_id)
             step_timings["step1_fastmrz"] = f"{time.time() - step_start:.2f}s"
             working_process_step["step1_fastmrz"] = fastmrz_result.get("method_used", "FastMRZ")
             
@@ -232,10 +265,10 @@ def scan_passport(
             print("\n" + "-"*60)
             print("STEP 2: PassportEye Fallback Validation")
             print("-"*60)
-            print(f"  Input image size: {image.size[0]}x{image.size[1]}")
+            print(f"  Input image size: {document_section_image.size[0]}x{document_section_image.size[1]}")
             
             step_start = time.time()
-            passporteye_result = validate_passport_with_PassportEye_fallback(image, verbose=True, user_id=user_id)
+            passporteye_result = validate_passport_with_PassportEye_fallback(document_section_image, verbose=True, user_id=user_id)
             step_timings["step2_passporteye"] = f"{time.time() - step_start:.2f}s"
             working_process_step["step2_passporteye"] = passporteye_result.get("method_used", "PassportEye")
             
@@ -288,7 +321,7 @@ def scan_passport(
             
             step_start = time.time()
             from easyOCR import validate_passport_with_easyocr_fallback
-            easyocr_result = validate_passport_with_easyocr_fallback(image, verbose=True, user_folder=user_folder, user_id=user_id)
+            easyocr_result = validate_passport_with_easyocr_fallback(document_section_image, verbose=True, user_folder=user_folder, user_id=user_id)
             step_timings["step3_easyocr"] = f"{time.time() - step_start:.2f}s"
             working_process_step["step3_easyocr"] = easyocr_result.get("method_used", "EasyOCR")
             
@@ -346,7 +379,7 @@ def scan_passport(
             step_start = time.time()
             try:
                 from tesseractOCR import validate_passport_with_tesseract_fallback
-                tesseract_result = validate_passport_with_tesseract_fallback(image, verbose=True, user_id=user_id, previous_passport_validation=previous_passport_validation)
+                tesseract_result = validate_passport_with_tesseract_fallback(document_section_image, verbose=True, user_id=user_id, previous_passport_validation=previous_passport_validation)
                 step_timings["step4_tesseract"] = f"{time.time() - step_start:.2f}s"
                 working_process_step["step4_tesseract"] = tesseract_result.get("method_used", "Tesseract")
                 
@@ -473,7 +506,7 @@ def scan_passport(
             step_start = time.time()
             try:
                 from ittcheck import validate_passport_with_ittcheck
-                ittcheck_result = validate_passport_with_ittcheck(image, verbose=True, user_id=user_id)
+                ittcheck_result = validate_passport_with_ittcheck(document_section_image, verbose=True, user_id=user_id)
                 
 
                 
@@ -554,14 +587,16 @@ def scan_passport(
                 print("\n" + "-"*60)
                 print("🤖 STEP 7: AI Parser (Gemini - Final Fallback)")
                 print("-"*60)
+                print(f"  Using original image for AI analysis: {original_image_for_ai.size[0]}x{original_image_for_ai.size[1]}")
                 
                 step_start = time.time()
                 
-                # Use image_url if available, otherwise use PIL Image
+                # Use original image for AI Parser (Step 7)
+                # Use image_url if available, otherwise use original PIL Image
                 if image_url:
                     ai_result = gemini_ocr(image_url, is_url=True, user_id=user_id)
                 else:
-                    ai_result = gemini_ocr(image, is_url=False, user_id=user_id)
+                    ai_result = gemini_ocr(original_image_for_ai, is_url=False, user_id=user_id)
             
                 step_timings["step7_ai_parser"] = f"{time.time() - step_start:.2f}s"
                 working_process_step["step7_ai_parser"] = "AI"
