@@ -328,36 +328,46 @@ def get_user_id_from_base64(base64_string: str) -> str:
     return f"base64_{timestamp}_{data_hash}"
 
 
-def cleanup_user_folder(user_folder: Path):
+def save_passport_page_crop(image: Image.Image, user_folder: Path = None) -> str:
     """
-    Delete all files in a user's temporary folder and associated validation failure files
+    Save passport page crop as passport_page_crop.jpg
     
     Args:
-        user_folder: Path to user's temp folder
+        image: PIL Image object of the cropped passport page
+        user_folder: Optional user-specific folder path
+        
+    Returns:
+        Path to saved passport_page_crop.jpg file
     """
     try:
-        if user_folder and user_folder.exists():
-            # Extract user_id from folder name to find associated validation files
-            user_id = user_folder.name
-            
-            # Delete all files in the folder
-            for file in user_folder.glob("*"):
-                if file.is_file():
-                    file.unlink()
-            # Delete the folder itself
-            user_folder.rmdir()
-            print(f"  ✓ Cleaned up user folder: {user_folder.name}")
-            
-            # Also delete associated validation failure JSON files
-            temp_dir = user_folder.parent
-            validation_files = list(temp_dir.glob(f"validation_failures_{user_id}.json"))
-            for validation_file in validation_files:
-                if validation_file.exists():
-                    validation_file.unlink()
-                    print(f"  ✓ Cleaned up validation file: {validation_file.name}")
-        # print(f"  ✓ Cleaned up user folder")
+        # Determine save path
+        if user_folder:
+            user_path = Path(user_folder)
+            user_path.mkdir(parents=True, exist_ok=True)
+            save_path = user_path / 'passport_page_crop.jpg'
+        else:
+            temp_dir = Path('temp')
+            temp_dir.mkdir(exist_ok=True)
+            save_path = temp_dir / 'passport_page_crop.jpg'
+        
+        # Convert RGBA to RGB if needed (JPEG doesn't support alpha channel)
+        if image.mode in ('RGBA', 'LA', 'P'):
+            rgb_image = Image.new('RGB', image.size, (255, 255, 255))
+            if image.mode == 'P':
+                image = image.convert('RGBA')
+            rgb_image.paste(image, mask=image.split()[-1] if image.mode in ('RGBA', 'LA') else None)
+            image = rgb_image
+        
+        # Save the image
+        image.save(str(save_path), 'JPEG', quality=95)
+        print(f"Saved passport page crop: {save_path}")
+        
+        return str(save_path)
+        
     except Exception as e:
-        print(f"  ⚠ Failed to cleanup user folder: {e}")
+        print(f"⚠️ Failed to save passport page crop: {e}")
+        return ""
+
 
 
 def save_temp_image(image: Image.Image, prefix: str = "temp", user_folder: Path = None) -> Path:
@@ -417,6 +427,70 @@ def check_field_validation_threshold(mrz_text: str, threshold: int = 10, verbose
         
         # Validate all fields
         field_results = validate_passport_fields(mrz_text)
+        
+        # Count valid fields
+        valid_count = sum(1 for status in field_results.values() if status == "Valid")
+        total_count = len(field_results)
+        
+        # Check threshold
+        threshold_met = valid_count >= threshold
+        summary = f"{valid_count}/{total_count} fields are valid"
+        
+        if verbose:
+            print(f"\n🔍 FIELD VALIDATION CHECK:")
+            for field, status in field_results.items():
+                status_icon = "✅" if status == "Valid" else "❌"
+                print(f"  {status_icon} {field:20}: {status}")
+            
+            print(f"\n📊 Validation Summary: {summary}")
+            print(f"   Threshold: {threshold}/10 fields required")
+            print(f"   Result: {'✅ PASSED' if threshold_met else '❌ FAILED'}")
+        
+        return {
+            "threshold_met": threshold_met,
+            "valid_count": valid_count,
+            "total_count": total_count,
+            "field_results": field_results,
+            "summary": summary
+        }
+        
+    except Exception as e:
+        if verbose:
+            print(f"❌ Error during field validation: {e}")
+        
+        return {
+            "threshold_met": False,
+            "valid_count": 0,
+            "total_count": 10,
+            "field_results": {},
+            "summary": "Validation error"
+        }
+
+
+def check_passport_data_validation_threshold(passport_data: dict, threshold: int = 10, verbose: bool = False) -> dict:
+    """
+    Check if extracted passport data validation meets the required threshold
+    
+    Args:
+        passport_data: Dictionary with extracted passport data
+        threshold: Minimum number of valid fields required (default: 10)
+        verbose: Print validation details
+        
+    Returns:
+        Dictionary with validation results:
+        {
+            "threshold_met": bool,
+            "valid_count": int,
+            "total_count": int,
+            "field_results": dict,
+            "summary": str
+        }
+    """
+    try:
+        from passport_check import validate_passport_data_fields
+        
+        # Validate all fields
+        field_results = validate_passport_data_fields(passport_data)
         
         # Count valid fields
         valid_count = sum(1 for status in field_results.values() if status == "Valid")
@@ -660,32 +734,253 @@ def analyze_previous_failures(validation_data: dict, current_method: str) -> dic
     return analysis
 
 
+
+
+
+def cleanup_user_folder(user_folder: Path):
+    """
+    Delete all files in a user's temporary folder and associated validation failure files
+    Windows-compatible version that handles subdirectories and hidden files
+    
+    Args:
+        user_folder: Path to user's temp folder
+    """
+    import shutil
+    
+    try:
+        # # # DEBUG MODE: Don't delete files for debugging purposes
+        # print(f"  DEBUG MODE: Skipping cleanup of user folder: {user_folder}")
+        # print(f"  Files preserved for debugging in: {user_folder}")
+        
+        # In production, you would uncomment the following:
+        if user_folder and user_folder.exists():
+            # Extract user_id from folder name to find associated validation files
+            user_id = user_folder.name
+            
+            # Use shutil.rmtree for robust directory deletion on Windows
+            # This handles subdirectories, hidden files, and file permissions
+            try:
+                shutil.rmtree(user_folder)
+                print(f"  ✓ Cleaned up user folder: {user_folder.name}")
+            except PermissionError:
+                # If permission error, try to delete files individually first
+                print(f"  ⚠ Permission issue, trying individual file deletion...")
+                cleanup_folder_contents_recursive(user_folder)
+                try:
+                    user_folder.rmdir()
+                    print(f"  ✓ Cleaned up user folder: {user_folder.name}")
+                except Exception as e:
+                    print(f"  ⚠ Could not remove folder {user_folder.name}: {e}")
+            
+            # Also delete associated validation failure JSON files
+            temp_dir = user_folder.parent
+            validation_files = list(temp_dir.glob(f"validation_failures_{user_id}.json"))
+            for validation_file in validation_files:
+                if validation_file.exists():
+                    try:
+                        validation_file.unlink()
+                        print(f"  ✓ Cleaned up validation file: {validation_file.name}")
+                    except Exception as e:
+                        print(f"  ⚠ Could not remove validation file {validation_file.name}: {e}")
+                        
+    except Exception as e:
+        print(f"  ⚠ Failed to cleanup user folder: {e}")
+
+
+
+
+
+
+
+
+def cleanup_folder_contents_recursive(folder_path: Path):
+    """
+    Recursively delete all contents of a folder (Windows-compatible)
+    
+    Args:
+        folder_path: Path to folder to clean
+    """
+    try:
+        if not folder_path.exists():
+            return
+            
+        # Delete all files and subdirectories
+        for item in folder_path.iterdir():
+            try:
+                if item.is_file() or item.is_symlink():
+                    # Handle read-only files on Windows
+                    item.chmod(0o777)  # Make writable
+                    item.unlink()
+                elif item.is_dir():
+                    # Recursively delete subdirectory
+                    cleanup_folder_contents_recursive(item)
+                    item.rmdir()
+            except Exception as e:
+                print(f"    ⚠ Could not delete {item.name}: {e}")
+                
+    except Exception as e:
+        print(f"  ⚠ Error during recursive cleanup: {e}")
+
+
+
+def cleanup_json_files_after_success(user_id: str = None, folder_path: str = None):
+    """
+    Clean up JSON files after successful passport data extraction
+    
+    Args:
+        user_id: Optional user ID to clean specific user files
+        folder_path: Optional specific folder path to clean
+    """
+    import json
+    from pathlib import Path
+    
+    try:
+        # Determine which folder to clean
+        if folder_path:
+            cleanup_folder = Path(folder_path)
+        elif user_id:
+            cleanup_folder = config.TEMP_DIR / user_id
+        else:
+            cleanup_folder = config.TEMP_DIR
+        
+        if not cleanup_folder.exists():
+            print(f"  ℹ️ Cleanup folder does not exist: {cleanup_folder}")
+            return
+        
+        # Find and remove JSON files
+        json_files = list(cleanup_folder.glob("*.json"))
+        
+        if json_files:
+            print(f"  🧹 Cleaning up {len(json_files)} JSON files from: {cleanup_folder}")
+            
+            for json_file in json_files:
+                try:
+                    json_file.unlink()
+                    print(f"    ✓ Removed: {json_file.name}")
+                except Exception as e:
+                    print(f"    ❌ Failed to remove {json_file.name}: {e}")
+        else:
+            print(f"  ✅ No JSON files to clean up in: {cleanup_folder}")
+        
+        # Also clean validation failure files if user_id is provided
+        if user_id:
+            validation_files = list(config.TEMP_DIR.glob(f"validation_failures_{user_id}.json"))
+            for validation_file in validation_files:
+                try:
+                    validation_file.unlink()
+                    print(f"    ✓ Removed validation file: {validation_file.name}")
+                except Exception as e:
+                    print(f"    ❌ Failed to remove validation file: {e}")
+        
+    except Exception as e:
+        print(f"  ⚠️ Error during JSON cleanup: {e}")
+
+
+def cleanup_all_temp_json_files():
+    """
+    Clean up all JSON files from the temp directory (global cleanup)
+    """
+    try:
+        temp_dir = config.TEMP_DIR
+        
+        # Find all JSON files in temp directory and subdirectories
+        json_files = []
+        json_files.extend(temp_dir.glob("*.json"))  # Root level JSON files
+        
+        # Also check subdirectories
+        for subfolder in temp_dir.iterdir():
+            if subfolder.is_dir():
+                json_files.extend(subfolder.glob("*.json"))
+        
+        if json_files:
+            print(f"🧹 Global cleanup: Found {len(json_files)} JSON files to remove")
+            
+            for json_file in json_files:
+                try:
+                    json_file.unlink()
+                    print(f"  ✓ Removed: {json_file.relative_to(temp_dir)}")
+                except Exception as e:
+                    print(f"  ❌ Failed to remove {json_file.name}: {e}")
+        else:
+            print("✅ No JSON files found for cleanup")
+            
+    except Exception as e:
+        print(f"⚠️ Error during global JSON cleanup: {e}")
+
+
+def cleanup_user_data_after_success(user_id: str):
+    """
+    Complete cleanup after successful passport data extraction
+    Removes JSON files, validation failures, and optionally temp images
+    
+    Args:
+        user_id: User ID for targeted cleanup
+    """
+    try:
+        print(f"🧹 Starting cleanup for user: {user_id}")
+        
+        # 1. Clean up JSON files in user folder
+        user_folder = config.TEMP_DIR / user_id
+        cleanup_json_files_after_success(user_id=user_id)
+        
+        # 2. Remove validation failure files
+        remove_validation_failures(user_id)
+        
+        # 3. Optionally clean up temp images (uncomment if needed)
+        cleanup_user_folder(user_folder)
+        
+        print(f"✅ Cleanup completed for user: {user_id}")
+        
+    except Exception as e:
+        print(f"⚠️ Error during user cleanup: {e}")
+
+
 def cleanup_temp_files():
     """
-    Clean up old temporary files and folders
+    Clean up old temporary files, folders, and JSON files
+    Windows-compatible version with robust directory handling
     """
+    import shutil
+    
     try:
         # Clean up old individual files in root temp dir
         for file in config.TEMP_DIR.glob("*.jpg"):
             # Delete files older than 1 hour
             if (datetime.now().timestamp() - file.stat().st_mtime) > 3600:
-                file.unlink()
+                try:
+                    file.unlink()
+                except Exception as e:
+                    print(f"  ⚠ Could not delete {file.name}: {e}")
+        
+        # Clean up old JSON files (older than 1 hour)
+        for file in config.TEMP_DIR.glob("*.json"):
+            if (datetime.now().timestamp() - file.stat().st_mtime) > 3600:
+                try:
+                    file.unlink()
+                    print(f"  ✓ Cleaned up old JSON file: {file.name}")
+                except Exception as e:
+                    print(f"  ⚠ Could not delete JSON file {file.name}: {e}")
         
         # Clean up old validation failure files (older than 2 hours)
         for file in config.TEMP_DIR.glob("validation_failures_*.json"):
             if (datetime.now().timestamp() - file.stat().st_mtime) > 7200:  # 2 hours
-                file.unlink()
+                try:
+                    file.unlink()
+                except Exception as e:
+                    print(f"  ⚠ Could not delete validation file {file.name}: {e}")
         
-        # Clean up old user folders (older than 1 hour)
+        # Clean up old user folders (older than 1 hour) - Windows-compatible
         for folder in config.TEMP_DIR.iterdir():
             if folder.is_dir():
                 # Check if folder is older than 1 hour
                 if (datetime.now().timestamp() - folder.stat().st_mtime) > 3600:
-                    # Delete all files in the folder
-                    for file in folder.glob("*"):
-                        if file.is_file():
-                            file.unlink()
-                    # Delete the folder
-                    folder.rmdir()
-    except Exception:
-        pass  # Ignore cleanup errors
+                    try:
+                        # Use shutil.rmtree for robust deletion
+                        shutil.rmtree(folder)
+                        print(f"  ✓ Cleaned up old folder: {folder.name}")
+                    except Exception as e:
+                        print(f"  ⚠ Could not delete folder {folder.name}: {e}")
+                        
+    except Exception as e:
+        print(f"  ⚠ Error during temp files cleanup: {e}")
+        pass  # Continue despite cleanup errors

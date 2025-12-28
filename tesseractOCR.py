@@ -9,7 +9,12 @@ import tempfile
 import os
 import signal
 import subprocess
-import psutil
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("Warning: psutil not available, process cleanup will be limited")
 from PIL import Image
 from typing import Dict, Optional, Tuple
 import pytesseract
@@ -27,6 +32,10 @@ _image_analysis_cache = {}
 
 def cleanup_tesseract_processes():
     """Clean up any stuck Tesseract processes"""
+    if not PSUTIL_AVAILABLE:
+        print("  → Warning: psutil not available, cannot cleanup Tesseract processes")
+        return
+        
     try:
         for proc in psutil.process_iter(['pid', 'name', 'create_time']):
             try:
@@ -144,10 +153,21 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         lines, all_text = fixed_enhanced_text_processing(extracted_text, verbose)
         
         # Advanced passport indicator check with more patterns
-        passport_score = advanced_passport_indicators(all_text, lines)
+        passport_score, found_indicators = advanced_passport_indicators_detailed(all_text, lines)
         
         if verbose:
-            print(f"  -> Passport indicators found: {passport_score}/14")
+            print(f"  -> Passport indicators found: {passport_score}/44")
+            if passport_score > 0:
+                print(f"     Found indicators: {', '.join(found_indicators)}")
+            else:
+                print(f"     No indicators found in text")
+            
+            # Show sample of extracted text for debugging
+            if len(all_text) > 0:
+                sample_text = all_text[:200].replace('\n', ' ').strip()
+                print(f"     Sample OCR text: '{sample_text}{'...' if len(all_text) > 200 else ''}'")
+            else:
+                print(f"     OCR text is empty or very short")
         
         # Check for passport validation indicators
         passport_keywords = ["passport", "pasport", "p<"]
@@ -155,11 +175,15 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         
         has_passport_keyword = any(keyword in all_text.lower() for keyword in passport_keywords)
         has_enough_brackets = angle_bracket_count >= 3
+        has_sufficient_indicators = passport_score >= 3  # Use our indicator system
         
         # If previous step already validated as passport, override local validation
-        if previous_passport_validation or has_passport_keyword or has_enough_brackets:
+        if previous_passport_validation or has_passport_keyword or has_enough_brackets or has_sufficient_indicators:
             if verbose:
-                print(f"  ✓ Valid for passport image.")
+                if has_sufficient_indicators and not (has_passport_keyword or has_enough_brackets):
+                    print(f"  ✓ Valid for passport image (based on {passport_score} indicators).")
+                else:
+                    print(f"  ✓ Valid for passport image.")
         else:
             if verbose:
                 print(f"  ✗ Not Valid for Passport")
@@ -171,7 +195,7 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                 "error": "Not Valid for Passport"
             }
         
-        if passport_score < 3:  # Lower threshold for initial check
+        if passport_score < 3:  # Adjusted threshold for global passport support
             if verbose:
                 print(f"  X No passport indicators found in text")
             return {
@@ -245,13 +269,13 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
         if passport_data.get("expiry_date"):
             passport_data["expiry_date"] = enhanced_format_date(passport_data["expiry_date"])
         
-        # Enhanced field validation with more flexible threshold
+        # Enhanced field validation with standard threshold
         from utils import check_field_validation_threshold
-        validation_check = check_field_validation_threshold(mrz_text, threshold=8, verbose=verbose)  # Lower threshold
+        validation_check = check_field_validation_threshold(mrz_text, threshold=10, verbose=verbose)  # Standard threshold
         
         if not validation_check["threshold_met"]:
             if verbose:
-                print(f"!! Field validation threshold not met: {validation_check['valid_count']}/8 fields valid")
+                print(f"!! Field validation threshold not met: {validation_check['valid_count']}/10 fields valid")
                 print(f"   -> Proceeding to next validation method...")
             
             # Enhanced validation failure handling
@@ -264,12 +288,12 @@ def validate_passport_with_tesseract_fallback(image: Image.Image, verbose: bool 
                 "passport_data": passport_data,
                 "mrz_text": mrz_text,
                 "method_used": "TesseractOCR",
-                "error": f"Field validation threshold not met: {validation_check['valid_count']}/8 fields valid",
+                "error": f"Field validation threshold not met: {validation_check['valid_count']}/10 fields valid",
                 "validation_summary": validation_check
             }
         
         if verbose:
-            print(f"OK Field validation threshold met: {validation_check['valid_count']}/8 fields valid")
+            print(f"OK Field validation threshold met: {validation_check['valid_count']}/10 fields valid")
             print(f"   -> Returning validated passport data...")
             print(f"  OK Passport data extracted successfully")
             print(f"    Surname: {passport_data.get('surname', '')}")
@@ -401,10 +425,10 @@ def enhanced_preprocess_for_passport_ocr(img: np.ndarray, verbose: bool = False)
 
 def get_enhanced_ocr_configs() -> list:
     """
-    Return enhanced OCR configurations with additional optimizations
+    Return top 4 OCR configurations for faster processing
     
     Returns:
-        List of OCR configuration strings
+        List of OCR configuration strings (limited to 4 for speed)
     """
     return [
         # PSM 6: Single uniform block (most effective for passports)
@@ -415,8 +439,7 @@ def get_enhanced_ocr_configs() -> list:
         r'',
         # Single text line mode for MRZ with enhanced whitelist
         r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>',
-        # Additional: PSM 11 for sparse text (MRZ-like)
-        r'--oem 3 --psm 11 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>',
+        # Removed PSM 11 to limit to top 4 variants for speed
     ]
 
 def multi_stage_ocr_attempts(processed_images: list, ocr_configs: list, original_img: np.ndarray, verbose: bool = False) -> Tuple[Optional[str], float]:
@@ -435,81 +458,85 @@ def multi_stage_ocr_attempts(processed_images: list, ocr_configs: list, original
     best_result = None
     best_confidence = 0
     
-    # Stage 1: Try all processed images with all configs
-    for i, processed_img in enumerate(processed_images):
-        for j, config in enumerate(ocr_configs):
-            try:
-                if verbose:
-                    print(f"    -> Stage 1 - Trying OCR variant {i+1}.{j+1}...")
-                
-                # Early exit optimization
-                if best_confidence > 0.90:  # Higher threshold for early exit
-                    if verbose:
-                        print(f"      >> Skipping remaining configs (excellent result: {best_confidence:.2f})")
-                    break
-                
-                import time
-                import threading
-                start_time = time.time()
-                
-                # Add timeout mechanism (3 seconds max)
-                extracted_text = None
-                ocr_exception = None
-                
-                def run_ocr():
-                    nonlocal extracted_text, ocr_exception
-                    try:
-                        extracted_text = run_tesseract_with_timeout(processed_img, config, timeout=5)
-                    except Exception as e:
-                        ocr_exception = e
-                
-                # Run OCR in a separate thread with timeout
-                ocr_thread = threading.Thread(target=run_ocr)
-                ocr_thread.daemon = True
-                ocr_thread.start()
-                ocr_thread.join(timeout=3.0)  # 3 second timeout
-                
-                processing_time = time.time() - start_time
-                
-                if ocr_thread.is_alive():
-                    if verbose:
-                        print(f"      >> Took max 3 s otherwise it skipping")
-                    continue
-                
-                if ocr_exception:
-                    if verbose:
-                        print(f"      X OCR variant {i+1}.{j+1} failed: {ocr_exception}")
-                    continue
-                
-                if verbose:
-                    print(f"      >> Took {processing_time:.1f}s")
-                
-                if not extracted_text or len(extracted_text.strip()) < 10:
-                    continue
-                
-                # Enhanced quality evaluation
-                text_quality = enhanced_evaluate_ocr_quality(extracted_text, verbose=False)
-                
-                if text_quality > best_confidence:
-                    best_confidence = text_quality
-                    best_result = extracted_text
-                    if verbose:
-                        print(f"      OK New best result (quality: {text_quality:.2f})")
-                
-                # Early termination for excellent results
-                if text_quality > 0.90:
-                    if verbose:
-                        print(f"      OK Excellent result found, stopping search")
-                    return best_result, best_confidence
-                
-            except Exception as e:
-                if verbose:
-                    print(f"      X OCR variant {i+1}.{j+1} failed: {e}")
-                continue
+    # Stage 1: Try only specific OCR variants for speed (1.1, 1.2, 2.1, 2.3, 3.1, 3.2)
+    target_variants = [(0, 0), (0, 1), (1, 0), (1, 2), (2, 0), (2, 1)]  # (image_idx, config_idx)
+    
+    for img_idx, config_idx in target_variants:
+        # Skip if indices are out of range
+        if img_idx >= len(processed_images) or config_idx >= len(ocr_configs):
+            continue
+            
+        processed_img = processed_images[img_idx]
+        config = ocr_configs[config_idx]
         
-        # Break outer loop if excellent quality found
-        if best_confidence > 0.90:
-            break
+        try:
+            if verbose:
+                print(f"    -> Stage 1 - Trying OCR variant {img_idx+1}.{config_idx+1}...")
+            
+            # Early exit optimization
+            if best_confidence > 0.90:  # Higher threshold for early exit
+                if verbose:
+                    print(f"      >> Skipping remaining configs (excellent result: {best_confidence:.2f})")
+                break
+                
+            import time
+            import threading
+            start_time = time.time()
+            
+            # Add timeout mechanism (3 seconds max)
+            extracted_text = None
+            ocr_exception = None
+            
+            def run_ocr():
+                nonlocal extracted_text, ocr_exception
+                try:
+                    extracted_text = run_tesseract_with_timeout(processed_img, config, timeout=5)
+                except Exception as e:
+                    ocr_exception = e
+            
+            # Run OCR in a separate thread with timeout
+            ocr_thread = threading.Thread(target=run_ocr)
+            ocr_thread.daemon = True
+            ocr_thread.start()
+            ocr_thread.join(timeout=3.0)  # 3 second timeout
+            
+            processing_time = time.time() - start_time
+            
+            if ocr_thread.is_alive():
+                if verbose:
+                    print(f"      >> Took max 3 s otherwise it skipping")
+                continue
+            
+            if ocr_exception:
+                if verbose:
+                    print(f"      X OCR variant {img_idx+1}.{config_idx+1} failed: {ocr_exception}")
+                continue
+            
+            if verbose:
+                print(f"      >> Took {processing_time:.1f}s")
+            
+            if not extracted_text or len(extracted_text.strip()) < 10:
+                continue
+            
+            # Enhanced quality evaluation
+            text_quality = enhanced_evaluate_ocr_quality(extracted_text, verbose=False)
+            
+            if text_quality > best_confidence:
+                best_confidence = text_quality
+                best_result = extracted_text
+                if verbose:
+                    print(f"      OK New best result (quality: {text_quality:.2f})")
+            
+            # Early termination for excellent results
+            if text_quality > 0.90:
+                if verbose:
+                    print(f"      OK Excellent result found, stopping search")
+                return best_result, best_confidence
+            
+        except Exception as e:
+            if verbose:
+                print(f"      X OCR variant {img_idx+1}.{config_idx+1} failed: {e}")
+            continue
     
     # Stage 2: Try additional enhancement techniques if results are mediocre
     if best_confidence < 0.70:
@@ -574,9 +601,97 @@ def multi_stage_ocr_attempts(processed_images: list, ocr_configs: list, original
     
     return best_result, best_confidence
 
+def advanced_passport_indicators_detailed(all_text: str, lines: list) -> tuple:
+    """
+    Advanced passport indicator check with detailed breakdown for debugging
+    
+    Args:
+        all_text: All extracted text
+        lines: List of text lines
+        
+    Returns:
+        Tuple of (score, list_of_found_indicators)
+    """
+    text_upper = all_text.upper()
+    
+    indicators = {
+        # Core passport keywords (universal)
+        "PASSPORT": "PASSPORT" in text_upper,
+        "PASSEPORT": "PASSEPORT" in text_upper,  # French
+        "PASSAPORTE": "PASSAPORTE" in text_upper,  # Portuguese/Spanish
+        "REISEPASS": "REISEPASS" in text_upper,  # German
+        "PASPOORT": "PASPOORT" in text_upper,  # Dutch
+        
+        # Government/State indicators (universal)
+        "REPUBLIC": "REPUBLIC" in text_upper,
+        "KINGDOM": "KINGDOM" in text_upper,
+        "FEDERATION": "FEDERATION" in text_upper,
+        "GOVERNMENT": "GOVERNMENT" in text_upper,
+        "MINISTRY": "MINISTRY" in text_upper,
+        "DEPARTMENT": "DEPARTMENT" in text_upper,
+        "COMMONWEALTH": "COMMONWEALTH" in text_upper,
+        
+        # Common country/state words (universal)
+        "STATE": "STATE" in text_upper,
+        "NATION": "NATION" in text_upper,
+        "COUNTRY": "COUNTRY" in text_upper,
+        "UNION": "UNION" in text_upper,
+        "UNITED": "UNITED" in text_upper,
+        
+        # MRZ technical indicators (universal)
+        "MRZ_PADDING": bool(re.search(r"<{2,}", all_text)),
+        "MRZ_PASSPORT_TYPE": bool(re.search(r"P<[A-Z]{3}", all_text)),
+        "LONG_ALPHANUMERIC": bool(re.search(r"[A-Z0-9]{8,}", all_text)),
+        "DATE_PATTERNS": bool(re.search(r"\d{6}", all_text)),
+        "COUNTRY_CODE_NUMBERS": bool(re.search(r"[A-Z]{3}[0-9]{6,}", all_text)),
+        
+        # Document structure indicators (universal)
+        "LONG_LINES": len([line for line in lines if len(line.strip()) > 30]) >= 2,
+        "VERY_LONG_LINES": len([line for line in lines if len(line.strip()) > 40]) >= 1,
+        "PASSPORT_NUMBER_PATTERN": bool(re.search(r"[A-Z]{2,3}[0-9]{7,}", all_text)),
+        
+        # Additional universal patterns
+        "DOCUMENT_NUMBER": bool(re.search(r"DOCUMENT\s+(?:NO|NUMBER)", text_upper)),
+        "NATIONALITY": bool(re.search(r"NATIONALITY", text_upper)),
+        "DATE_FIELDS": bool(re.search(r"DATE\s+OF\s+(?:BIRTH|ISSUE|EXPIRY)", text_upper)),
+        "PLACE_FIELDS": bool(re.search(r"PLACE\s+OF\s+(?:BIRTH|ISSUE)", text_upper)),
+        "GIVEN_NAMES": bool(re.search(r"GIVEN\s+NAMES?", text_upper)),
+        "SURNAME": bool(re.search(r"SURNAME", text_upper)),
+        
+        # International organization indicators
+        "SCHENGEN": "SCHENGEN" in text_upper,
+        "EUROPEAN": "EUROPEAN" in text_upper,
+        "AFRICAN": "AFRICAN" in text_upper,
+        "AMERICAN": "AMERICAN" in text_upper,
+        "ASIAN": "ASIAN" in text_upper,
+        
+        # Additional country-neutral terms
+        "CITIZEN": "CITIZEN" in text_upper,
+        "EMBASSY": "EMBASSY" in text_upper,
+        "CONSULATE": "CONSULATE" in text_upper,
+        "AUTHORITY": "AUTHORITY" in text_upper,
+        
+        # Major country names (for better detection)
+        "PAKISTAN": "PAKISTAN" in text_upper,
+        "INDIA": "INDIA" in text_upper,
+        "BANGLADESH": "BANGLADESH" in text_upper,
+        "USA": "USA" in text_upper,
+        
+        # Common passport abbreviations and codes
+        "PAK": "PAK" in text_upper,  # Pakistan abbreviation
+        "IND": "IND" in text_upper,  # India abbreviation  
+        "BGD": "BGD" in text_upper,  # Bangladesh abbreviation
+        "GBR": "GBR" in text_upper,  # Great Britain abbreviation
+    }
+    
+    found_indicators = [name for name, found in indicators.items() if found]
+    score = len(found_indicators)
+    
+    return score, found_indicators
+
 def advanced_passport_indicators(all_text: str, lines: list) -> int:
     """
-    Advanced passport indicator check with more patterns
+    Advanced passport indicator check with global country support
     
     Args:
         all_text: All extracted text
@@ -585,21 +700,76 @@ def advanced_passport_indicators(all_text: str, lines: list) -> int:
     Returns:
         Passport indicator score
     """
+    text_upper = all_text.upper()
+    
     passport_indicators = [
-        "PASSPORT" in all_text.upper(),
-        "REPUBLIC" in all_text.upper(),
-        "PEOPLE" in all_text.upper(),
-        "BANGLADESH" in all_text.upper(),
-        "INDIA" in all_text.upper(),
-        "PAKISTAN" in all_text.upper(),
-        "USA" in all_text.upper(),
-        "UNITED" in all_text.upper(),
-        "STATE" in all_text.upper(),
+        # Core passport keywords (universal)
+        "PASSPORT" in text_upper,
+        "PASSEPORT" in text_upper,  # French
+        "PASSAPORTE" in text_upper,  # Portuguese/Spanish
+        "REISEPASS" in text_upper,  # German
+        "PASPOORT" in text_upper,  # Dutch
+        
+        # Government/State indicators (universal)
+        "REPUBLIC" in text_upper,
+        "KINGDOM" in text_upper,
+        "FEDERATION" in text_upper,
+        "GOVERNMENT" in text_upper,
+        "MINISTRY" in text_upper,
+        "DEPARTMENT" in text_upper,
+        "COMMONWEALTH" in text_upper,  # Added for Australia, etc.
+        
+        # Common country/state words (universal)
+        "STATE" in text_upper,
+        "NATION" in text_upper,
+        "COUNTRY" in text_upper,
+        "UNION" in text_upper,
+        "UNITED" in text_upper,  # Added back for broader coverage
+        
+        # MRZ technical indicators (universal)
         bool(re.search(r"<{2,}", all_text)),  # MRZ padding
         bool(re.search(r"P<[A-Z]{3}", all_text)),  # MRZ passport type
-        bool(re.search(r"[A-Z0-9]{8,}", all_text)),  # Long alphanumeric
-        bool(re.search(r"\d{6}", all_text)),  # Date patterns
+        bool(re.search(r"[A-Z0-9]{8,}", all_text)),  # Long alphanumeric sequences
+        bool(re.search(r"\d{6}", all_text)),  # Date patterns (YYMMDD)
+        bool(re.search(r"[A-Z]{3}[0-9]{6,}", all_text)),  # Country code + numbers
+        
+        # Document structure indicators (universal)
         len([line for line in lines if len(line.strip()) > 30]) >= 2,  # Long lines
+        len([line for line in lines if len(line.strip()) > 40]) >= 1,  # Very long lines
+        bool(re.search(r"[A-Z]{2,3}[0-9]{7,}", all_text)),  # Passport number patterns
+        
+        # Additional universal patterns
+        bool(re.search(r"DOCUMENT\s+(?:NO|NUMBER)", text_upper)),  # Document number
+        bool(re.search(r"NATIONALITY", text_upper)),  # Nationality field
+        bool(re.search(r"DATE\s+OF\s+(?:BIRTH|ISSUE|EXPIRY)", text_upper)),  # Date fields
+        bool(re.search(r"PLACE\s+OF\s+(?:BIRTH|ISSUE)", text_upper)),  # Place fields
+        bool(re.search(r"GIVEN\s+NAMES?", text_upper)),  # Given names field
+        bool(re.search(r"SURNAME", text_upper)),  # Surname field
+        
+        # International organization indicators
+        "SCHENGEN" in text_upper,
+        "EUROPEAN" in text_upper,
+        "AFRICAN" in text_upper,
+        "AMERICAN" in text_upper,
+        "ASIAN" in text_upper,
+        
+        # Additional country-neutral terms
+        "CITIZEN" in text_upper,
+        "EMBASSY" in text_upper,
+        "CONSULATE" in text_upper,
+        "AUTHORITY" in text_upper,
+        
+        # Major country names (for better detection)
+        "PAKISTAN" in text_upper,
+        "INDIA" in text_upper,
+        "BANGLADESH" in text_upper,
+        "USA" in text_upper,
+        
+        # Common passport abbreviations and codes
+        "PAK" in text_upper,  # Pakistan abbreviation
+        "IND" in text_upper,  # India abbreviation  
+        "BGD" in text_upper,  # Bangladesh abbreviation
+        "GBR" in text_upper,  # Great Britain abbreviation
     ]
     
     return sum(passport_indicators)

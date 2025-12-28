@@ -11,6 +11,7 @@ from fastMRZ import validate_passport_with_fastmrz_fallback
 from passport_detector import passport_validation_checker
 from gemini_passport_parser import gemini_ocr
 from function_handler_switch import is_step_enabled, print_step_status
+from face_detection import step0_face_detection_and_alignment
 
 
 def scan_passport(
@@ -24,6 +25,7 @@ def scan_passport(
     Scan passport image and extract MRZ data using multi-layered fallback system
     
     Flow (AI=ON):
+    0. Face Detection & Alignment → Preprocess image
     1. FastMRZ Fallback → Success? Return
     2. PassportEye Fallback → Success? Return
     3. EasyOCR Fallback → Success? Return
@@ -33,6 +35,7 @@ def scan_passport(
     7. All failed → Error
     
     Flow (AI=OFF):
+    0. Face Detection & Alignment → Preprocess image
     1. FastMRZ Fallback → Success? Return
     2. PassportEye Fallback → Success? Return
     3. EasyOCR Fallback → Success? Return
@@ -56,22 +59,22 @@ def scan_passport(
     try:
         # Step 0: Image Loading & Preprocessing
         print("\n" + "="*60)
-        print("📄 PASSPORT SCANNER - MULTI-LAYERED FALLBACK SYSTEM")
+        print("[PASSPORT SCANNER] - MULTI-LAYERED FALLBACK SYSTEM")
         print("="*60)
-        print(f"🔧 AI Mode: {'ON' if use_gemini else 'OFF'}")
+        print(f"[AI MODE]: {'ON' if use_gemini else 'OFF'}")
         
         # Show step controller status
         print_step_status()
         
         step_start = time.time()
         if image_url:
-            print(f"\n📥 Loading image from URL...")
+            print(f"\n[DOWNLOAD] Loading image from URL...")
             image = download_image(image_url)
-            print(f"  ✓ Image loaded: {image.size} {image.mode}")
+            print(f"  [SUCCESS] Image loaded: {image.size} {image.mode}")
         elif image_base64:
-            print(f"\n📥 Decoding base64 image...")
+            print(f"\n[DOWNLOAD] Decoding base64 image...")
             image = decode_base64_image(image_base64)
-            print(f"  ✓ Image decoded: {image.size} {image.mode}")
+            print(f"  [SUCCESS] Image decoded: {image.size} {image.mode}")
         else:
             return {
                 "success": False,
@@ -102,21 +105,119 @@ def scan_passport(
             user_folder_path = create_user_temp_folder(user_id)
             user_folder = str(user_folder_path)
         
+        # ROTATION DETECTION: Check and correct image orientation FIRST
+        print("\n" + "-"*60)
+        print("[ROTATION] Hough Line Image Orientation Detection & Correction")
+        print("-"*60)
+        
+        step_start = time.time()
+        from image_rotation_detector import detect_and_correct_rotation, save_rotation_debug_images, save_line_detection_debug
+        
+        rotation_result = detect_and_correct_rotation(image, verbose=True)
+        step_timings["rotation_detection"] = f"{time.time() - step_start:.2f}s"
+        working_process_step["rotation_detection"] = rotation_result.get("method_used", "Hough Line Detection")
+        
+        if rotation_result.get("success", False):
+            if rotation_result.get("rotation_needed", False):
+                print(f"✅ Image rotation corrected: {rotation_result['rotation_applied']:.2f}° using Hough lines")
+                # Use the corrected image for all subsequent processing
+                original_size = f"{image.size[0]}x{image.size[1]}"
+                image = rotation_result["corrected_image"]
+                corrected_size = f"{image.size[0]}x{image.size[1]}"
+                print(f"  Image updated: {original_size} → {corrected_size}")
+            else:
+                print("✅ Image orientation is correct (no rotation needed)")
+            
+            # Save rotation debug images if user folder is available
+            if user_folder:
+                save_rotation_debug_images(rotation_result, user_folder)
+                # Also save line detection debug for analysis
+                save_line_detection_debug(rotation_result["original_image"], user_folder)
+        else:
+            print(f"[WARNING] Rotation detection failed: {rotation_result.get('error', 'Unknown error')}")
+            print("  [INFO] Continuing with original image orientation")
+        
         # Initialize result variables to avoid undefined errors
+        face_detection_result = {"error": "Step not executed", "success": False}
         fastmrz_result = {"error": "Step not executed", "success": False}
         passporteye_result = {"error": "Step not executed", "success": False}
         easyocr_result = {"error": "Step not executed", "success": False}
         tesseract_result = {"error": "Step not executed", "success": False}
         ai_result = {"error": "Step not executed", "success": False}
         
+        # Store original image for Step 7 (AI Parser)
+        original_image_for_ai = image
+        
+        # STEP 0: Face Detection & Alignment
+        if is_step_enabled("STEP0", step_config_override):
+            print("\n" + "-"*60)
+            print("[STEP 0] Face Detection & Alignment")
+            print("-"*60)
+            
+            step_start = time.time()
+            face_detection_result = step0_face_detection_and_alignment(image, user_folder=user_folder)
+            step_timings["step0_face_detection"] = f"{time.time() - step_start:.2f}s"
+            working_process_step["step0_face_detection"] = face_detection_result.get("method_used", "Face Detection")
+            
+            if face_detection_result.get("success", False):
+                print("✅ Face detection and alignment completed")
+                # Use the processed image for subsequent steps
+                original_size = f"{image.size[0]}x{image.size[1]}"
+                processed_size = f"{face_detection_result.get('processed_image', image).size[0]}x{face_detection_result.get('processed_image', image).size[1]}"
+                image = face_detection_result.get("processed_image", image)
+                print(f"  Image passed to next step: {original_size} → {processed_size}")
+                print(f"  Debug files available in: {user_folder}")
+            else:
+                print(f"[WARNING] Face detection failed: {face_detection_result.get('error', 'Unknown error')}")
+                print("  [INFO] Continuing with original image")
+                print(f"  Using original image: {image.size[0]}x{image.size[1]}")
+        else:
+            print("\n" + "-"*60)
+            print("⏭ STEP 0: Face Detection & Alignment - SKIPPED (DISABLED)")
+            print("-"*60)
+            face_detection_result = {"error": "Step disabled", "success": False}
+            step_timings["step0_face_detection"] = "0.00s"
+            working_process_step["step0_face_detection"] = "Skipped (Disabled)"
+        
+        # Check for imagedata_section_full.jpg and use it for Steps 1-6
+        document_section_image = image  # Default to current processed image
+        if user_folder:
+            from pathlib import Path
+            imagedata_path = Path(user_folder) / 'imagedata_section_full.jpg'
+            if imagedata_path.exists():
+                try:
+                    document_section_image = Image.open(str(imagedata_path))
+                    print(f"\n📄 Using document section image for Steps 1-6: {imagedata_path}")
+                    print(f"  Document section size: {document_section_image.size[0]}x{document_section_image.size[1]}")
+                    print(f"  Original image reserved for Step 7: {original_image_for_ai.size[0]}x{original_image_for_ai.size[1]}")
+                except Exception as e:
+                    print(f"⚠ Failed to load document section image: {e}")
+                    print("  Using processed image for all steps")
+            else:
+                print(f"\n📄 Document section image not found, using processed image for Steps 1-6")
+        else:
+            # Try fallback temp location
+            from pathlib import Path
+            imagedata_path = Path('temp') / 'imagedata_section_full.jpg'
+            if imagedata_path.exists():
+                try:
+                    document_section_image = Image.open(str(imagedata_path))
+                    print(f"\n📄 Using document section image for Steps 1-6: {imagedata_path}")
+                    print(f"  Document section size: {document_section_image.size[0]}x{document_section_image.size[1]}")
+                    print(f"  Original image reserved for Step 7: {original_image_for_ai.size[0]}x{original_image_for_ai.size[1]}")
+                except Exception as e:
+                    print(f"⚠ Failed to load document section image: {e}")
+                    print("  Using processed image for all steps")
+        
         # STEP 1: FastMRZ Fallback Validation
         if is_step_enabled("STEP1", step_config_override):
             print("\n" + "-"*60)
             print("🔍 STEP 1: FastMRZ Fallback Validation")
             print("-"*60)
+            print(f"  Input image size: {document_section_image.size[0]}x{document_section_image.size[1]}")
             
             step_start = time.time()
-            fastmrz_result = validate_passport_with_fastmrz_fallback(image, verbose=True, user_id=user_id)
+            fastmrz_result = validate_passport_with_fastmrz_fallback(document_section_image, verbose=True, user_id=user_id)
             step_timings["step1_fastmrz"] = f"{time.time() - step_start:.2f}s"
             working_process_step["step1_fastmrz"] = fastmrz_result.get("method_used", "FastMRZ")
             
@@ -162,11 +263,12 @@ def scan_passport(
         # STEP 2: PassportEye Fallback Validation
         if is_step_enabled("STEP2", step_config_override):
             print("\n" + "-"*60)
-            print("🔍 STEP 2: PassportEye Fallback Validation")
+            print("STEP 2: PassportEye Fallback Validation")
             print("-"*60)
+            print(f"  Input image size: {document_section_image.size[0]}x{document_section_image.size[1]}")
             
             step_start = time.time()
-            passporteye_result = validate_passport_with_PassportEye_fallback(image, verbose=True, user_id=user_id)
+            passporteye_result = validate_passport_with_PassportEye_fallback(document_section_image, verbose=True, user_id=user_id)
             step_timings["step2_passporteye"] = f"{time.time() - step_start:.2f}s"
             working_process_step["step2_passporteye"] = passporteye_result.get("method_used", "PassportEye")
             
@@ -219,7 +321,7 @@ def scan_passport(
             
             step_start = time.time()
             from easyOCR import validate_passport_with_easyocr_fallback
-            easyocr_result = validate_passport_with_easyocr_fallback(image, verbose=True, user_folder=user_folder, user_id=user_id)
+            easyocr_result = validate_passport_with_easyocr_fallback(document_section_image, verbose=True, user_folder=user_folder, user_id=user_id)
             step_timings["step3_easyocr"] = f"{time.time() - step_start:.2f}s"
             working_process_step["step3_easyocr"] = easyocr_result.get("method_used", "EasyOCR")
             
@@ -277,7 +379,7 @@ def scan_passport(
             step_start = time.time()
             try:
                 from tesseractOCR import validate_passport_with_tesseract_fallback
-                tesseract_result = validate_passport_with_tesseract_fallback(image, verbose=True, user_id=user_id, previous_passport_validation=previous_passport_validation)
+                tesseract_result = validate_passport_with_tesseract_fallback(document_section_image, verbose=True, user_id=user_id, previous_passport_validation=previous_passport_validation)
                 step_timings["step4_tesseract"] = f"{time.time() - step_start:.2f}s"
                 working_process_step["step4_tesseract"] = tesseract_result.get("method_used", "Tesseract")
                 
@@ -404,7 +506,7 @@ def scan_passport(
             step_start = time.time()
             try:
                 from ittcheck import validate_passport_with_ittcheck
-                ittcheck_result = validate_passport_with_ittcheck(image, verbose=True, user_id=user_id)
+                ittcheck_result = validate_passport_with_ittcheck(document_section_image, verbose=True, user_id=user_id)
                 
 
                 
@@ -485,14 +587,16 @@ def scan_passport(
                 print("\n" + "-"*60)
                 print("🤖 STEP 7: AI Parser (Gemini - Final Fallback)")
                 print("-"*60)
+                print(f"  Using original image for AI analysis: {original_image_for_ai.size[0]}x{original_image_for_ai.size[1]}")
                 
                 step_start = time.time()
                 
-                # Use image_url if available, otherwise use PIL Image
+                # Use original image for AI Parser (Step 7)
+                # Use image_url if available, otherwise use original PIL Image
                 if image_url:
                     ai_result = gemini_ocr(image_url, is_url=True, user_id=user_id)
                 else:
-                    ai_result = gemini_ocr(image, is_url=False, user_id=user_id)
+                    ai_result = gemini_ocr(original_image_for_ai, is_url=False, user_id=user_id)
             
                 step_timings["step7_ai_parser"] = f"{time.time() - step_start:.2f}s"
                 working_process_step["step7_ai_parser"] = "AI"
@@ -576,7 +680,7 @@ def scan_passport(
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"\n❌ CRITICAL ERROR: {e}")
+        print(f"\n[ERROR] CRITICAL ERROR: {e}")
         print(f"Traceback:\n{error_details}")
         
         # Clean up user temp folder on critical error
