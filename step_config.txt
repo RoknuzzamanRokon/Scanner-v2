@@ -16,4 +16,4 @@ STEP3=on
 STEP4=on
 STEP5=on
 STEP6=on
-STEP7=on
+STEP7=off
